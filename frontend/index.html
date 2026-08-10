@@ -2,6 +2,7 @@
 <html lang="ko">
 
 <head>
+
     <meta charset="UTF-8">
 
     <meta
@@ -15,280 +16,249 @@
         rel="stylesheet"
         href="style.css"
     >
-</head>
 
+</head>
 
 <body>
 
-    <!-- =========================
-         Header
-    ========================== -->
+<!-- =========================
+     Header
+========================== -->
 
-    <header class="header">
+<header class="header">
 
-        <div class="logo">
-            PIGSTY
-        </div>
+    <div class="logo">
+        PIGSTY
+    </div>
 
+    <nav>
 
-        <nav>
+        <a
+            class="active"
+            href="#"
+        >
+            홈
+        </a>
 
-            <a
-                class="active"
-                href="#"
-            >
-                홈
-            </a>
+        <a href="#">
+            인기
+        </a>
 
-            <a href="#">
-                인기
-            </a>
+        <a href="#">
+            카테고리
+        </a>
 
-            <a href="#">
-                카테고리
-            </a>
+    </nav>
 
-        </nav>
+    <div class="header-right">
 
+        <button
+            class="search-btn"
+            type="button"
+        >
+            ⌕
+        </button>
 
-        <div class="header-right">
+        <div id="authArea">
 
             <button
-                class="search-btn"
+                class="login-btn"
+                id="loginBtn"
                 type="button"
             >
-                ⌕
+                로그인
             </button>
 
+        </div>
 
-            <div id="authArea">
+    </div>
 
-                <button
-                    class="login-btn"
-                    id="loginBtn"
-                    type="button"
-                >
-                    로그인
-                </button>
+</header>
+
+
+<!-- =========================
+     Main
+========================== -->
+
+<main>
+
+    <section class="welcome">
+
+        <div>
+
+            <span class="badge">
+                PIGSTY COMMUNITY
+            </span>
+
+            <h1>
+                자유롭게 공유하는 공간
+            </h1>
+
+            <p>
+                다양한 이야기를 공유하고
+                서로의 취향을 존중해보세요.
+            </p>
+
+        </div>
+
+        <button
+            class="write-btn"
+            type="button"
+        >
+            글쓰기
+        </button>
+
+    </section>
+
+
+    <!-- =========================
+         Content
+    ========================== -->
+
+    <div class="layout">
+
+        <section class="feed">
+
+            <div class="feed-header">
+
+                <div class="tabs">
+
+                    <button
+                        class="selected"
+                        type="button"
+                    >
+                        최신
+                    </button>
+
+                    <button
+                        type="button"
+                    >
+                        인기
+                    </button>
+
+                </div>
+
+                <select>
+
+                    <option>
+                        최신순
+                    </option>
+
+                    <option>
+                        인기순
+                    </option>
+
+                </select>
 
             </div>
 
-        </div>
 
-    </header>
+            <!-- Posts -->
+
+            <div
+                id="posts"
+                class="posts"
+            >
+
+                <div class="empty-posts">
+
+                    <h3>
+                        게시물을 불러오는 중...
+                    </h3>
+
+                    <p>
+                        잠시만 기다려주세요.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </section>
 
 
+        <!-- =========================
+             Sidebar
+        ========================== -->
 
-    <!-- =========================
-         Main
-    ========================== -->
+        <aside>
 
-    <main>
+            <div class="side-card">
 
-
-        <!-- Welcome -->
-
-        <section class="welcome">
-
-            <div>
-
-                <span class="badge">
-                    PIGSTY COMMUNITY
-                </span>
-
-
-                <h1>
-                    자유롭게 공유하는 공간
-                </h1>
-
+                <h3>
+                    PIGSTY
+                </h3>
 
                 <p>
-                    다양한 이야기를 공유하고
-                    서로의 취향을 존중해보세요.
+                    서로의 취향을 존중하며
+                    자유롭게 이야기를 나누는
+                    커뮤니티입니다.
                 </p>
 
             </div>
 
 
-            <button
-                class="write-btn"
-                type="button"
-            >
-                글쓰기
-            </button>
+            <div class="side-card">
 
-        </section>
+                <h3>
+                    인기 태그
+                </h3>
 
+                <div class="tag-list">
 
+                    <span>
+                        #일상
+                    </span>
 
-        <!-- =========================
-             Content
-        ========================== -->
+                    <span>
+                        #취미
+                    </span>
 
-        <div class="layout">
+                    <span>
+                        #사진
+                    </span>
 
+                    <span>
+                        #이야기
+                    </span>
 
-            <!-- Feed -->
-
-            <section class="feed">
-
-
-                <div class="feed-header">
-
-                    <div class="tabs">
-
-                        <button
-                            class="selected"
-                            type="button"
-                        >
-                            최신
-                        </button>
-
-
-                        <button
-                            type="button"
-                        >
-                            인기
-                        </button>
-
-                    </div>
-
-
-                    <select>
-
-                        <option>
-                            최신순
-                        </option>
-
-                        <option>
-                            인기순
-                        </option>
-
-                    </select>
+                    <span>
+                        #자유
+                    </span>
 
                 </div>
 
+            </div>
 
 
-                <!--
-                    게시글이 여기에 들어감
-                -->
+            <div class="side-card warning">
 
-                <div
-                    id="posts"
-                    class="posts"
-                >
+                <h3>
+                    커뮤니티 이용 안내
+                </h3>
 
-                    <div class="empty-posts">
+                <p>
+                    다른 이용자를 존중하고
+                    불법적이거나 타인에게
+                    피해를 주는 콘텐츠는
+                    게시하지 마세요.
+                    도배 또한 금지됩니다.
+                </p>
 
-                        <h3>
-                            게시물을 불러오는 중...
-                        </h3>
+            </div>
 
-                        <p>
-                            잠시만 기다려주세요.
-                        </p>
+        </aside>
 
-                    </div>
+    </div>
 
-                </div>
-
-
-            </section>
+</main>
 
 
+<!-- =========================
+     JavaScript
+========================== -->
 
-            <!-- =========================
-                 Sidebar
-            ========================== -->
-
-            <aside>
-
-
-                <div class="side-card">
-
-                    <h3>
-                        PIGSTY
-                    </h3>
-
-                    <p>
-                        서로의 취향을 존중하며
-                        자유롭게 이야기를 나누는
-                        커뮤니티입니다.
-                    </p>
-
-                </div>
-
-
-
-                <div class="side-card">
-
-                    <h3>
-                        인기 태그
-                    </h3>
-
-
-                    <div class="tag-list">
-
-                        <span>
-                            #일상
-                        </span>
-
-                        <span>
-                            #취미
-                        </span>
-
-                        <span>
-                            #사진
-                        </span>
-
-                        <span>
-                            #이야기
-                        </span>
-
-                        <span>
-                            #자유
-                        </span>
-
-                    </div>
-
-                </div>
-
-
-
-                <div class="side-card warning">
-
-                    <h3>
-                        커뮤니티 이용 안내
-                    </h3>
-
-                    <p>
-                        다른 이용자를 존중하고
-                        불법적이거나 타인에게
-                        피해를 주는 콘텐츠는
-                        게시하지 마세요.
-                    </p>
-
-                </div>
-
-
-            </aside>
-
-
-        </div>
-
-
-    </main>
-
-
-
-    <!-- =========================
-         JavaScript
-    ========================== -->
-
-    <script
-        src="script.js"
-    ></script>
+<script src="script.js"></script>
 
 </body>
 

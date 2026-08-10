@@ -9,7 +9,6 @@ let currentUser = null;
 // =========================
 
 const authArea = document.getElementById("authArea");
-const loginBtn = document.getElementById("loginBtn");
 
 
 // =========================
@@ -93,6 +92,7 @@ function updateAuthUI() {
 
         authArea.innerHTML = `
             <div class="user-menu">
+
                 <span class="username">
                     ${escapeHtml(currentUser.username)}
                 </span>
@@ -100,9 +100,11 @@ function updateAuthUI() {
                 <button
                     class="logout-btn"
                     id="logoutBtn"
+                    type="button"
                 >
                     로그아웃
                 </button>
+
             </div>
         `;
 
@@ -119,6 +121,7 @@ function updateAuthUI() {
             <button
                 class="login-btn"
                 id="loginBtn"
+                type="button"
             >
                 로그인
             </button>
@@ -144,6 +147,7 @@ function logout() {
     );
 
     updateAuthUI();
+    loadPosts();
 }
 
 
@@ -179,6 +183,8 @@ async function login(
 
     closeModal();
 
+    await loadPosts();
+
     alert("로그인 성공!");
 }
 
@@ -208,20 +214,18 @@ async function register(
         "회원가입 성공! 이제 로그인하세요."
     );
 
-    showLoginForm();
+    openLoginModal();
 }
 
 
 // =========================
-// Posts
+// Posts - Get
 // =========================
 
 async function loadPosts() {
 
     const postsContainer =
-        document.getElementById(
-            "posts"
-        );
+        document.getElementById("posts");
 
     if (!postsContainer) return;
 
@@ -235,10 +239,15 @@ async function loadPosts() {
 
             postsContainer.innerHTML = `
                 <div class="empty-posts">
-                    <h3>아직 게시물이 없습니다.</h3>
+
+                    <h3>
+                        아직 게시물이 없습니다.
+                    </h3>
+
                     <p>
                         첫 번째 게시물을 올려보세요.
                     </p>
+
                 </div>
             `;
 
@@ -246,9 +255,9 @@ async function loadPosts() {
         }
 
         postsContainer.innerHTML =
-            posts.map(
-                createPostHTML
-            ).join("");
+            posts
+                .map(createPostHTML)
+                .join("");
 
         attachPostEvents();
 
@@ -256,13 +265,24 @@ async function loadPosts() {
 
         postsContainer.innerHTML = `
             <div class="empty-posts">
-                <h3>게시물을 불러오지 못했습니다.</h3>
-                <p>${escapeHtml(error.message)}</p>
+
+                <h3>
+                    게시물을 불러오지 못했습니다.
+                </h3>
+
+                <p>
+                    ${escapeHtml(error.message)}
+                </p>
+
             </div>
         `;
     }
 }
 
+
+// =========================
+// Create Post HTML
+// =========================
 
 function createPostHTML(post) {
 
@@ -272,6 +292,23 @@ function createPostHTML(post) {
             .map(tag => tag.trim())
             .filter(Boolean)
         : [];
+
+
+    // 관리자에게만 삭제 버튼 표시
+    const deleteButton =
+        currentUser &&
+        Number(currentUser.is_admin) === 1
+            ? `
+                <button
+                    class="delete-btn"
+                    data-id="${post.id}"
+                    type="button"
+                >
+                    삭제
+                </button>
+            `
+            : "";
+
 
     return `
         <article
@@ -291,37 +328,48 @@ function createPostHTML(post) {
 
             </div>
 
+
             <h2 class="post-title">
                 ${escapeHtml(post.title)}
             </h2>
+
 
             <p class="post-content">
                 ${escapeHtml(post.content)}
             </p>
 
+
             ${
                 tags.length
-                ? `
-                    <div class="post-tags">
-                        ${
-                            tags.map(
-                                tag =>
-                                `<span>#${escapeHtml(tag)}</span>`
-                            ).join("")
-                        }
-                    </div>
-                `
-                : ""
+                    ? `
+                        <div class="post-tags">
+
+                            ${
+                                tags
+                                    .map(
+                                        tag =>
+                                            `<span>#${escapeHtml(tag)}</span>`
+                                    )
+                                    .join("")
+                            }
+
+                        </div>
+                    `
+                    : ""
             }
+
 
             <div class="post-actions">
 
                 <button
                     class="like-btn"
                     data-id="${post.id}"
+                    type="button"
                 >
                     ♥ ${post.likes || 0}
                 </button>
+
+                ${deleteButton}
 
             </div>
 
@@ -330,8 +378,14 @@ function createPostHTML(post) {
 }
 
 
+// =========================
+// Post Events
+// =========================
+
 function attachPostEvents() {
 
+
+    // 좋아요
     document
         .querySelectorAll(".like-btn")
         .forEach(button => {
@@ -364,7 +418,63 @@ function attachPostEvents() {
                     }
                 }
             );
+
         });
+
+
+    // 관리자 삭제
+    document
+        .querySelectorAll(".delete-btn")
+        .forEach(button => {
+
+            button.addEventListener(
+                "click",
+                async () => {
+
+                    const id =
+                        button.dataset.id;
+
+
+                    const confirmed =
+                        confirm(
+                            "정말 이 게시글을 삭제하시겠습니까?"
+                        );
+
+
+                    if (!confirmed) {
+                        return;
+                    }
+
+
+                    try {
+
+                        await apiFetch(
+                            `/api/posts/${id}`,
+                            {
+                                method: "DELETE"
+                            }
+                        );
+
+
+                        alert(
+                            "게시글이 삭제되었습니다."
+                        );
+
+
+                        await loadPosts();
+
+                    } catch (error) {
+
+                        alert(
+                            `삭제 실패: ${error.message}`
+                        );
+                    }
+
+                }
+            );
+
+        });
+
 }
 
 
@@ -387,6 +497,7 @@ async function createPost(
         return;
     }
 
+
     await apiFetch(
         "/api/posts",
         {
@@ -400,11 +511,31 @@ async function createPost(
         }
     );
 
+
     closeModal();
 
     await loadPosts();
 
-    alert("게시물이 등록되었습니다!");
+    alert(
+        "게시물이 등록되었습니다!"
+    );
+}
+
+
+// =========================
+// Delete Post
+// =========================
+
+async function deletePost(postId) {
+
+    await apiFetch(
+        `/api/posts/${postId}`,
+        {
+            method: "DELETE"
+        }
+    );
+
+    await loadPosts();
 }
 
 
@@ -415,32 +546,28 @@ async function createPost(
 function openModal(content) {
 
     let modal =
-        document.getElementById(
-            "modal"
-        );
+        document.getElementById("modal");
+
 
     if (!modal) {
 
         modal =
-            document.createElement(
-                "div"
-            );
+            document.createElement("div");
 
         modal.id = "modal";
 
-        modal.className =
-            "modal";
+        modal.className = "modal";
 
         document.body.appendChild(
             modal
         );
     }
 
+
     modal.innerHTML = content;
 
-    modal.classList.add(
-        "active"
-    );
+    modal.classList.add("active");
+
 
     modal
         .querySelector(".close")
@@ -448,6 +575,7 @@ function openModal(content) {
             "click",
             closeModal
         );
+
 
     modal.addEventListener(
         "click",
@@ -470,9 +598,8 @@ function openModal(content) {
 function closeModal() {
 
     const modal =
-        document.getElementById(
-            "modal"
-        );
+        document.getElementById("modal");
+
 
     if (modal) {
 
@@ -492,15 +619,21 @@ function closeModal() {
 function openLoginModal() {
 
     openModal(`
+
         <div class="modal-box">
 
             <button
                 class="close"
+                type="button"
             >
                 ×
             </button>
 
-            <h2>로그인</h2>
+
+            <h2>
+                로그인
+            </h2>
+
 
             <form id="loginForm">
 
@@ -511,12 +644,14 @@ function openLoginModal() {
                     required
                 >
 
+
                 <input
                     id="loginPassword"
                     type="password"
                     placeholder="비밀번호"
                     required
                 >
+
 
                 <button
                     class="submit"
@@ -527,12 +662,15 @@ function openLoginModal() {
 
             </form>
 
+
             <button
                 class="switch-auth"
                 id="registerSwitch"
+                type="button"
             >
                 계정이 없나요? 회원가입
             </button>
+
 
             <p
                 class="auth-message"
@@ -540,6 +678,7 @@ function openLoginModal() {
             ></p>
 
         </div>
+
     `);
 
 
@@ -551,6 +690,7 @@ function openLoginModal() {
 
                 event.preventDefault();
 
+
                 const username =
                     document
                         .getElementById(
@@ -558,12 +698,14 @@ function openLoginModal() {
                         )
                         .value;
 
+
                 const password =
                     document
                         .getElementById(
                             "loginPassword"
                         )
                         .value;
+
 
                 try {
 
@@ -581,6 +723,7 @@ function openLoginModal() {
                         .textContent =
                         error.message;
                 }
+
             }
         );
 
@@ -603,15 +746,21 @@ function openLoginModal() {
 function showRegisterForm() {
 
     openModal(`
+
         <div class="modal-box">
 
             <button
                 class="close"
+                type="button"
             >
                 ×
             </button>
 
-            <h2>회원가입</h2>
+
+            <h2>
+                회원가입
+            </h2>
+
 
             <form id="registerForm">
 
@@ -622,12 +771,14 @@ function showRegisterForm() {
                     required
                 >
 
+
                 <input
                     id="registerPassword"
                     type="password"
                     placeholder="비밀번호"
                     required
                 >
+
 
                 <button
                     class="submit"
@@ -638,12 +789,15 @@ function showRegisterForm() {
 
             </form>
 
+
             <button
                 class="switch-auth"
                 id="loginSwitch"
+                type="button"
             >
                 이미 계정이 있나요? 로그인
             </button>
+
 
             <p
                 class="auth-message"
@@ -651,18 +805,18 @@ function showRegisterForm() {
             ></p>
 
         </div>
+
     `);
 
 
     document
-        .getElementById(
-            "registerForm"
-        )
+        .getElementById("registerForm")
         ?.addEventListener(
             "submit",
             async event => {
 
                 event.preventDefault();
+
 
                 const username =
                     document
@@ -671,12 +825,14 @@ function showRegisterForm() {
                         )
                         .value;
 
+
                 const password =
                     document
                         .getElementById(
                             "registerPassword"
                         )
                         .value;
+
 
                 try {
 
@@ -694,6 +850,7 @@ function showRegisterForm() {
                         .textContent =
                         error.message;
                 }
+
             }
         );
 
@@ -728,15 +885,21 @@ function openWriteModal() {
 
 
     openModal(`
+
         <div class="modal-box">
 
             <button
                 class="close"
+                type="button"
             >
                 ×
             </button>
 
-            <h2>게시물 작성</h2>
+
+            <h2>
+                게시물 작성
+            </h2>
+
 
             <form id="postForm">
 
@@ -747,17 +910,20 @@ function openWriteModal() {
                     required
                 >
 
+
                 <textarea
                     id="postContent"
                     placeholder="내용을 작성하세요."
                     required
                 ></textarea>
 
+
                 <input
                     id="postTags"
                     type="text"
                     placeholder="태그 (쉼표로 구분)"
                 >
+
 
                 <button
                     class="submit"
@@ -769,6 +935,7 @@ function openWriteModal() {
             </form>
 
         </div>
+
     `);
 
 
@@ -780,12 +947,14 @@ function openWriteModal() {
 
                 event.preventDefault();
 
+
                 const title =
                     document
                         .getElementById(
                             "postTitle"
                         )
                         .value;
+
 
                 const content =
                     document
@@ -794,12 +963,14 @@ function openWriteModal() {
                         )
                         .value;
 
+
                 const tags =
                     document
                         .getElementById(
                             "postTags"
                         )
                         .value;
+
 
                 try {
 
@@ -815,6 +986,7 @@ function openWriteModal() {
                         error.message
                     );
                 }
+
             }
         );
 }
@@ -830,6 +1002,7 @@ function formatDate(dateString) {
 
     const date =
         new Date(dateString);
+
 
     return date.toLocaleString(
         "ko-KR",
@@ -847,11 +1020,26 @@ function formatDate(dateString) {
 function escapeHtml(value) {
 
     return String(value ?? "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
+        .replaceAll(
+            "&",
+            "&amp;"
+        )
+        .replaceAll(
+            "<",
+            "&lt;"
+        )
+        .replaceAll(
+            ">",
+            "&gt;"
+        )
+        .replaceAll(
+            '"',
+            "&quot;"
+        )
+        .replaceAll(
+            "'",
+            "&#039;"
+        );
 }
 
 
@@ -874,5 +1062,6 @@ document.addEventListener(
                 "click",
                 openWriteModal
             );
+
     }
 );
