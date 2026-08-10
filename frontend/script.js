@@ -3,16 +3,15 @@ const API = "https://pigsty-backend.onrender.com";
 let token = localStorage.getItem("pigsty_token");
 let currentUser = null;
 
-// =========================
+// =========================================================
 // DOM
-// =========================
+// =========================================================
 
 const authArea = document.getElementById("authArea");
-const loginBtn = document.getElementById("loginBtn");
 
-// =========================
+// =========================================================
 // API
-// =========================
+// =========================================================
 
 async function apiFetch(url, options = {}) {
 
@@ -50,7 +49,6 @@ async function apiFetch(url, options = {}) {
     return data;
 }
 
-
 // =========================================================
 // Auth
 // =========================================================
@@ -58,11 +56,8 @@ async function apiFetch(url, options = {}) {
 async function loadUser() {
 
     if (!token) {
-
         currentUser = null;
-
         updateAuthUI();
-
         return;
     }
 
@@ -75,7 +70,6 @@ async function loadUser() {
     } catch {
 
         token = null;
-
         currentUser = null;
 
         localStorage.removeItem(
@@ -85,7 +79,6 @@ async function loadUser() {
 
     updateAuthUI();
 }
-
 
 function updateAuthUI() {
 
@@ -139,11 +132,9 @@ function updateAuthUI() {
     }
 }
 
-
 function logout() {
 
     token = null;
-
     currentUser = null;
 
     localStorage.removeItem(
@@ -154,7 +145,6 @@ function logout() {
 
     loadPosts("latest");
 }
-
 
 // =========================================================
 // Login
@@ -191,7 +181,6 @@ async function login(
     alert("로그인 성공!");
 }
 
-
 // =========================================================
 // Register
 // =========================================================
@@ -220,7 +209,6 @@ async function register(
     openLoginModal();
 }
 
-
 // =========================================================
 // Posts
 // =========================================================
@@ -230,22 +218,37 @@ async function loadPosts(
 ) {
 
     const postsContainer =
-        document.getElementById(
-            "posts"
-        );
+        document.getElementById("posts");
 
     if (!postsContainer) return;
 
     try {
 
+        postsContainer.innerHTML = `
+            <div class="empty-posts">
+                <h3>
+                    게시물을 불러오는 중...
+                </h3>
+
+                <p>
+                    잠시만 기다려주세요.
+                </p>
+            </div>
+        `;
+
         const posts = await apiFetch(
             "/api/posts"
         );
 
+        if (!Array.isArray(posts)) {
+            throw new Error(
+                "게시물 데이터 형식이 올바르지 않습니다."
+            );
+        }
 
-        // =========================
-        // Empty
-        // =========================
+        // =====================================================
+        // 게시물 없음
+        // =====================================================
 
         if (!posts.length) {
 
@@ -266,10 +269,9 @@ async function loadPosts(
             return;
         }
 
-
-        // =========================
+        // =====================================================
         // 최신순
-        // =========================
+        // =====================================================
 
         if (sort === "latest") {
 
@@ -285,10 +287,9 @@ async function loadPosts(
             );
         }
 
-
-        // =========================
+        // =====================================================
         // 인기순
-        // =========================
+        // =====================================================
 
         if (sort === "popular") {
 
@@ -296,41 +297,38 @@ async function loadPosts(
                 (a, b) => {
 
                     const likeDifference =
-                        (b.likes || 0) -
-                        (a.likes || 0);
+                        (Number(b.likes) || 0) -
+                        (Number(a.likes) || 0);
 
-
-                    if (
-                        likeDifference !== 0
-                    ) {
-
+                    if (likeDifference !== 0) {
                         return likeDifference;
                     }
-
 
                     return (
                         new Date(b.created_at) -
                         new Date(a.created_at)
                     );
-
                 }
             );
         }
 
-
-        // =========================
+        // =====================================================
         // Render
-        // =========================
+        // =====================================================
 
         postsContainer.innerHTML =
             posts
                 .map(createPostHTML)
                 .join("");
 
-
         attachPostEvents();
 
     } catch (error) {
+
+        console.error(
+            "게시물 로딩 오류:",
+            error
+        );
 
         postsContainer.innerHTML = `
             <div class="empty-posts">
@@ -348,7 +346,6 @@ async function loadPosts(
     }
 }
 
-
 // =========================================================
 // Create Post HTML
 // =========================================================
@@ -358,14 +355,11 @@ function createPostHTML(post) {
     const tags = post.tags
         ? post.tags
             .split(",")
-            .map(tag => tag.trim())
+            .map(
+                tag => tag.trim()
+            )
             .filter(Boolean)
         : [];
-
-
-    // =========================
-    // 관리자 삭제 버튼
-    // =========================
 
     const adminButtons =
         currentUser &&
@@ -380,7 +374,6 @@ function createPostHTML(post) {
             </button>
         `
         : "";
-
 
     return `
         <article
@@ -442,9 +435,8 @@ function createPostHTML(post) {
                     data-id="${post.id}"
                     type="button"
                 >
-                    ♥ ${post.likes || 0}
+                    ♥ ${Number(post.likes) || 0}
                 </button>
-
 
                 ${adminButtons}
 
@@ -454,108 +446,101 @@ function createPostHTML(post) {
     `;
 }
 
-
 // =========================================================
 // Post Events
 // =========================================================
 
 function attachPostEvents() {
 
-
-    // =========================
+    // =====================================================
     // 좋아요
-    // =========================
+    // =====================================================
 
     document
         .querySelectorAll(".like-btn")
-        .forEach(button => {
+        .forEach(
+            button => {
 
-            button.addEventListener(
-                "click",
-                async () => {
+                button.addEventListener(
+                    "click",
+                    async () => {
 
-                    try {
+                        try {
+
+                            const id =
+                                button.dataset.id;
+
+                            const result =
+                                await apiFetch(
+                                    `/api/posts/${id}/like`,
+                                    {
+                                        method: "POST"
+                                    }
+                                );
+
+                            button.textContent =
+                                `♥ ${result.likes}`;
+
+                        } catch (error) {
+
+                            alert(
+                                error.message
+                            );
+                        }
+                    }
+                );
+            }
+        );
+
+
+    // =====================================================
+    // 관리자 게시글 삭제
+    // =====================================================
+
+    document
+        .querySelectorAll(".delete-btn")
+        .forEach(
+            button => {
+
+                button.addEventListener(
+                    "click",
+                    async () => {
 
                         const id =
                             button.dataset.id;
 
+                        if (
+                            !confirm(
+                                "이 게시글을 삭제하시겠습니까?"
+                            )
+                        ) {
+                            return;
+                        }
 
-                        const result =
+                        try {
+
                             await apiFetch(
-                                `/api/posts/${id}/like`,
+                                `/api/posts/${id}`,
                                 {
-                                    method: "POST"
+                                    method: "DELETE"
                                 }
                             );
 
+                            await loadPosts(
+                                "latest"
+                            );
 
-                        button.textContent =
-                            `♥ ${result.likes}`;
+                        } catch (error) {
 
-
-                    } catch (error) {
-
-                        alert(
-                            error.message
-                        );
+                            alert(
+                                error.message
+                            );
+                        }
                     }
-                }
-            );
-        });
-
-
-    // =========================
-    // 관리자 게시글 삭제
-    // =========================
-
-    document
-        .querySelectorAll(".delete-btn")
-        .forEach(button => {
-
-            button.addEventListener(
-                "click",
-                async () => {
-
-                    const id =
-                        button.dataset.id;
-
-
-                    if (
-                        !confirm(
-                            "이 게시글을 삭제하시겠습니까?"
-                        )
-                    ) {
-
-                        return;
-                    }
-
-
-                    try {
-
-                        await apiFetch(
-                            `/api/posts/${id}`,
-                            {
-                                method: "DELETE"
-                            }
-                        );
-
-
-                        await loadPosts(
-                            "latest"
-                        );
-
-
-                    } catch (error) {
-
-                        alert(
-                            error.message
-                        );
-                    }
-                }
-            );
-        });
+                );
+            }
+        );
 }
-
 
 // =========================================================
 // Create Post
@@ -576,7 +561,6 @@ async function createPost(
         return;
     }
 
-
     await apiFetch(
         "/api/posts",
         {
@@ -590,20 +574,16 @@ async function createPost(
         }
     );
 
-
     closeModal();
-
 
     await loadPosts(
         "latest"
     );
 
-
     alert(
         "게시물이 등록되었습니다!"
     );
 }
-
 
 // =========================================================
 // Modal
@@ -616,7 +596,6 @@ function openModal(content) {
             "modal"
         );
 
-
     if (!modal) {
 
         modal =
@@ -625,7 +604,6 @@ function openModal(content) {
             );
 
         modal.id = "modal";
-
         modal.className = "modal";
 
         document.body.appendChild(
@@ -633,13 +611,11 @@ function openModal(content) {
         );
     }
 
-
     modal.innerHTML = content;
 
     modal.classList.add(
         "active"
     );
-
 
     modal
         .querySelector(".close")
@@ -648,7 +624,6 @@ function openModal(content) {
             closeModal
         );
 
-
     modal.addEventListener(
         "click",
         event => {
@@ -656,7 +631,6 @@ function openModal(content) {
             if (
                 event.target === modal
             ) {
-
                 closeModal();
             }
 
@@ -667,14 +641,12 @@ function openModal(content) {
     );
 }
 
-
 function closeModal() {
 
     const modal =
         document.getElementById(
             "modal"
         );
-
 
     if (modal) {
 
@@ -685,7 +657,6 @@ function closeModal() {
         modal.innerHTML = "";
     }
 }
-
 
 // =========================================================
 // Login Modal
@@ -756,7 +727,6 @@ function openLoginModal() {
 
     `);
 
-
     document
         .getElementById("loginForm")
         ?.addEventListener(
@@ -765,7 +735,6 @@ function openLoginModal() {
 
                 event.preventDefault();
 
-
                 const username =
                     document
                         .getElementById(
@@ -773,14 +742,12 @@ function openLoginModal() {
                         )
                         .value;
 
-
                 const password =
                     document
                         .getElementById(
                             "loginPassword"
                         )
                         .value;
-
 
                 try {
 
@@ -801,7 +768,6 @@ function openLoginModal() {
             }
         );
 
-
     document
         .getElementById(
             "registerSwitch"
@@ -811,7 +777,6 @@ function openLoginModal() {
             showRegisterForm
         );
 }
-
 
 // =========================================================
 // Register Modal
@@ -882,7 +847,6 @@ function showRegisterForm() {
 
     `);
 
-
     document
         .getElementById(
             "registerForm"
@@ -893,7 +857,6 @@ function showRegisterForm() {
 
                 event.preventDefault();
 
-
                 const username =
                     document
                         .getElementById(
@@ -901,14 +864,12 @@ function showRegisterForm() {
                         )
                         .value;
 
-
                 const password =
                     document
                         .getElementById(
                             "registerPassword"
                         )
                         .value;
-
 
                 try {
 
@@ -929,7 +890,6 @@ function showRegisterForm() {
             }
         );
 
-
     document
         .getElementById(
             "loginSwitch"
@@ -939,7 +899,6 @@ function showRegisterForm() {
             openLoginModal
         );
 }
-
 
 // =========================================================
 // Write Modal
@@ -957,7 +916,6 @@ function openWriteModal() {
 
         return;
     }
-
 
     openModal(`
 
@@ -1013,17 +971,13 @@ function openWriteModal() {
 
     `);
 
-
     document
-        .getElementById(
-            "postForm"
-        )
+        .getElementById("postForm")
         ?.addEventListener(
             "submit",
             async event => {
 
                 event.preventDefault();
-
 
                 const title =
                     document
@@ -1032,7 +986,6 @@ function openWriteModal() {
                         )
                         .value;
 
-
                 const content =
                     document
                         .getElementById(
@@ -1040,14 +993,12 @@ function openWriteModal() {
                         )
                         .value;
 
-
                 const tags =
                     document
                         .getElementById(
                             "postTags"
                         )
                         .value;
-
 
                 try {
 
@@ -1067,7 +1018,6 @@ function openWriteModal() {
         );
 }
 
-
 // =========================================================
 // Helpers
 // =========================================================
@@ -1078,10 +1028,12 @@ function formatDate(
 
     if (!dateString) return "";
 
-
     const date =
         new Date(dateString);
 
+    if (Number.isNaN(date.getTime())) {
+        return "";
+    }
 
     return date.toLocaleString(
         "ko-KR",
@@ -1094,7 +1046,6 @@ function formatDate(
         }
     );
 }
-
 
 function escapeHtml(
     value
@@ -1125,7 +1076,6 @@ function escapeHtml(
         );
 }
 
-
 // =========================================================
 // Page Events
 // =========================================================
@@ -1141,15 +1091,14 @@ document.addEventListener(
         );
 
 
-        // =========================
+        // =================================================
         // 최신 / 인기 탭
-        // =========================
+        // =================================================
 
         const tabs =
             document.querySelectorAll(
                 ".tabs button"
             );
-
 
         tabs.forEach(
             (button, index) => {
@@ -1168,11 +1117,9 @@ document.addEventListener(
                             }
                         );
 
-
                         button.classList.add(
                             "selected"
                         );
-
 
                         if (index === 0) {
 
@@ -1186,23 +1133,20 @@ document.addEventListener(
                                 "popular"
                             );
                         }
-
                     }
                 );
-
             }
         );
 
 
-        // =========================
+        // =================================================
         // 정렬 Select
-        // =========================
+        // =================================================
 
         const sortSelect =
             document.querySelector(
                 ".feed-header select"
             );
-
 
         sortSelect?.addEventListener(
             "change",
@@ -1217,7 +1161,6 @@ document.addEventListener(
                         "popular"
                     );
 
-
                     tabs.forEach(
                         btn => {
 
@@ -1227,7 +1170,6 @@ document.addEventListener(
 
                         }
                     );
-
 
                     tabs[1]
                         ?.classList.add(
@@ -1240,7 +1182,6 @@ document.addEventListener(
                         "latest"
                     );
 
-
                     tabs.forEach(
                         btn => {
 
@@ -1251,20 +1192,18 @@ document.addEventListener(
                         }
                     );
 
-
                     tabs[0]
                         ?.classList.add(
                             "selected"
                         );
                 }
-
             }
         );
 
 
-        // =========================
+        // =================================================
         // 글쓰기
-        // =========================
+        // =================================================
 
         document
             .querySelector(
