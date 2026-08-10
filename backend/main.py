@@ -55,6 +55,7 @@ def get_db():
 
     try:
         yield db
+
     finally:
         db.close()
 
@@ -179,6 +180,7 @@ pwd_context = CryptContext(
 
 
 def hash_password(password: str):
+
     return pwd_context.hash(password)
 
 
@@ -186,6 +188,7 @@ def verify_password(
     password: str,
     password_hash: str
 ):
+
     return pwd_context.verify(
         password,
         password_hash
@@ -243,6 +246,7 @@ def get_current_user(
         username = payload.get("sub")
 
         if not username:
+
             raise HTTPException(
                 status_code=401,
                 detail="Invalid token"
@@ -445,12 +449,6 @@ def me(
 # =========================================================
 # 임시 관리자 지정
 # =========================================================
-# 사용법:
-# 1. admin 계정을 일반 회원가입
-# 2. Swagger에서 POST /api/admin/make-admin/{username}
-# 3. username에 admin 입력
-# 4. 관리자 지정 완료 후 이 API는 삭제할 것
-# =========================================================
 
 @app.post(
     "/api/admin/make-admin/{username}"
@@ -598,7 +596,7 @@ def create_post(
 
 
 # =========================================================
-# Posts - Delete
+# Posts - Delete One
 # =========================================================
 
 @app.delete(
@@ -639,6 +637,41 @@ def delete_post(
 
     return {
         "message": "게시글이 삭제되었습니다."
+    }
+
+
+# =========================================================
+# Posts - Delete All
+# =========================================================
+
+@app.delete(
+    "/api/posts"
+)
+def delete_all_posts(
+    current_user: User =
+        Depends(get_current_user),
+
+    db: Session =
+        Depends(get_db)
+):
+
+    # 관리자만 전체 삭제 가능
+    if current_user.is_admin != 1:
+
+        raise HTTPException(
+            status_code=403,
+            detail="관리자만 모든 게시글을 삭제할 수 있습니다."
+        )
+
+    deleted_count = db.query(Post).delete(
+        synchronize_session=False
+    )
+
+    db.commit()
+
+    return {
+        "message": "모든 게시글이 삭제되었습니다.",
+        "deleted_count": deleted_count
     }
 
 
