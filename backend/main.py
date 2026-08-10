@@ -13,8 +13,6 @@ from sqlalchemy import (
     String,
     Text,
     DateTime,
-    inspect,
-    text,
 )
 
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
@@ -29,7 +27,9 @@ import jwt
 # =========================================================
 
 SECRET_KEY = "pigsty-dev-secret-key-change-this"
+
 ALGORITHM = "HS256"
+
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
 
 DATABASE_URL = "sqlite:///./pigsty.db"
@@ -56,6 +56,7 @@ Base = declarative_base()
 
 
 def get_db():
+
     db = SessionLocal()
 
     try:
@@ -91,12 +92,6 @@ class User(Base):
     )
 
     is_admin = Column(
-        Integer,
-        default=0,
-        nullable=False
-    )
-
-    is_banned = Column(
         Integer,
         default=0,
         nullable=False
@@ -151,40 +146,6 @@ class Post(Base):
 Base.metadata.create_all(
     bind=engine
 )
-
-
-# =========================================================
-# 기존 DB 마이그레이션
-# =========================================================
-
-def migrate_database():
-
-    inspector = inspect(engine)
-
-    tables = inspector.get_table_names()
-
-    if "users" not in tables:
-        return
-
-    columns = [
-        column["name"]
-        for column in inspector.get_columns("users")
-    ]
-
-    if "is_banned" not in columns:
-
-        with engine.begin() as connection:
-
-            connection.execute(
-                text(
-                    "ALTER TABLE users "
-                    "ADD COLUMN is_banned INTEGER "
-                    "NOT NULL DEFAULT 0"
-                )
-            )
-
-
-migrate_database()
 
 
 # =========================================================
@@ -276,11 +237,8 @@ def create_access_token(
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials =
-        Depends(security),
-
-    db: Session =
-        Depends(get_db)
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
 ):
 
     token = credentials.credentials
@@ -330,15 +288,6 @@ def get_current_user(
         )
 
 
-    # 밴된 사용자는 즉시 접근 차단
-    if user.is_banned == 1:
-
-        raise HTTPException(
-            status_code=403,
-            detail="밴된 계정입니다."
-        )
-
-
     return user
 
 
@@ -347,8 +296,7 @@ def get_current_user(
 # =========================================================
 
 def get_admin_user(
-    current_user: User =
-        Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
 
     if current_user.is_admin != 1:
@@ -405,9 +353,7 @@ def root():
 )
 def register(
     request: RegisterRequest,
-
-    db: Session =
-        Depends(get_db)
+    db: Session = Depends(get_db)
 ):
 
     username = request.username.strip()
@@ -449,8 +395,7 @@ def register(
         password_hash=hash_password(
             password
         ),
-        is_admin=0,
-        is_banned=0
+        is_admin=0
     )
 
 
@@ -476,9 +421,7 @@ def register(
 )
 def login(
     request: LoginRequest,
-
-    db: Session =
-        Depends(get_db)
+    db: Session = Depends(get_db)
 ):
 
     user = db.query(User).filter(
@@ -505,15 +448,6 @@ def login(
         )
 
 
-    # 밴 여부 확인
-    if user.is_banned == 1:
-
-        raise HTTPException(
-            status_code=403,
-            detail="밴된 계정입니다."
-        )
-
-
     token = create_access_token(
         user.username
     )
@@ -533,15 +467,13 @@ def login(
     "/api/auth/me"
 )
 def me(
-    current_user: User =
-        Depends(get_current_user)
+    current_user: User = Depends(get_current_user)
 ):
 
     return {
         "id": current_user.id,
         "username": current_user.username,
-        "is_admin": current_user.is_admin,
-        "is_banned": current_user.is_banned
+        "is_admin": current_user.is_admin
     }
 
 
@@ -554,9 +486,7 @@ def me(
 )
 def make_admin(
     username: str,
-
-    db: Session =
-        Depends(get_db)
+    db: Session = Depends(get_db)
 ):
 
     user = db.query(User).filter(
@@ -587,103 +517,6 @@ def make_admin(
 
 
 # =========================================================
-# Admin - Ban
-# =========================================================
-
-@app.post(
-    "/api/admin/ban/{username}"
-)
-def ban_user(
-    username: str,
-
-    current_admin: User =
-        Depends(get_admin_user),
-
-    db: Session =
-        Depends(get_db)
-):
-
-    user = db.query(User).filter(
-        User.username == username
-    ).first()
-
-
-    if not user:
-
-        raise HTTPException(
-            status_code=404,
-            detail="사용자를 찾을 수 없습니다."
-        )
-
-
-    # 자기 자신 밴 방지
-    if user.id == current_admin.id:
-
-        raise HTTPException(
-            status_code=400,
-            detail="자기 자신은 밴할 수 없습니다."
-        )
-
-
-    user.is_banned = 1
-
-    db.commit()
-
-    db.refresh(user)
-
-
-    return {
-        "message": "사용자를 밴했습니다.",
-        "username": user.username,
-        "is_banned": user.is_banned
-    }
-
-
-# =========================================================
-# Admin - Unban
-# =========================================================
-
-@app.post(
-    "/api/admin/unban/{username}"
-)
-def unban_user(
-    username: str,
-
-    current_admin: User =
-        Depends(get_admin_user),
-
-    db: Session =
-        Depends(get_db)
-):
-
-    user = db.query(User).filter(
-        User.username == username
-    ).first()
-
-
-    if not user:
-
-        raise HTTPException(
-            status_code=404,
-            detail="사용자를 찾을 수 없습니다."
-        )
-
-
-    user.is_banned = 0
-
-    db.commit()
-
-    db.refresh(user)
-
-
-    return {
-        "message": "밴을 해제했습니다.",
-        "username": user.username,
-        "is_banned": user.is_banned
-    }
-
-
-# =========================================================
 # Posts - Get
 # =========================================================
 
@@ -691,8 +524,7 @@ def unban_user(
     "/api/posts"
 )
 def get_posts(
-    db: Session =
-        Depends(get_db)
+    db: Session = Depends(get_db)
 ):
 
     posts = db.query(Post).order_by(
@@ -729,12 +561,8 @@ def get_posts(
 )
 def create_post(
     request: PostCreate,
-
-    current_user: User =
-        Depends(get_current_user),
-
-    db: Session =
-        Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
 
     title = request.title.strip()
@@ -797,12 +625,8 @@ def create_post(
 )
 def delete_post(
     post_id: int,
-
-    current_user: User =
-        Depends(get_current_user),
-
-    db: Session =
-        Depends(get_db)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
 
     if current_user.is_admin != 1:
@@ -845,9 +669,7 @@ def delete_post(
 )
 def like_post(
     post_id: int,
-
-    db: Session =
-        Depends(get_db)
+    db: Session = Depends(get_db)
 ):
 
     post = db.query(Post).filter(
