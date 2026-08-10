@@ -1,0 +1,878 @@
+const API = "http://127.0.0.1:8000";
+
+let token = localStorage.getItem("pigsty_token");
+let currentUser = null;
+
+
+// =========================
+// DOM
+// =========================
+
+const authArea = document.getElementById("authArea");
+const loginBtn = document.getElementById("loginBtn");
+
+
+// =========================
+// API
+// =========================
+
+async function apiFetch(url, options = {}) {
+
+    const headers = {
+        "Content-Type": "application/json",
+        ...(options.headers || {})
+    };
+
+    if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(
+        API + url,
+        {
+            ...options,
+            headers
+        }
+    );
+
+    let data = {};
+
+    try {
+        data = await response.json();
+    } catch {
+        data = {};
+    }
+
+    if (!response.ok) {
+        throw new Error(
+            data.detail || `HTTP ${response.status}`
+        );
+    }
+
+    return data;
+}
+
+
+// =========================
+// Auth
+// =========================
+
+async function loadUser() {
+
+    if (!token) {
+        currentUser = null;
+        updateAuthUI();
+        return;
+    }
+
+    try {
+
+        currentUser = await apiFetch(
+            "/api/auth/me"
+        );
+
+    } catch {
+
+        token = null;
+        currentUser = null;
+
+        localStorage.removeItem(
+            "pigsty_token"
+        );
+    }
+
+    updateAuthUI();
+}
+
+
+function updateAuthUI() {
+
+    if (!authArea) return;
+
+    if (currentUser) {
+
+        authArea.innerHTML = `
+            <div class="user-menu">
+                <span class="username">
+                    ${escapeHtml(currentUser.username)}
+                </span>
+
+                <button
+                    class="logout-btn"
+                    id="logoutBtn"
+                >
+                    로그아웃
+                </button>
+            </div>
+        `;
+
+        document
+            .getElementById("logoutBtn")
+            ?.addEventListener(
+                "click",
+                logout
+            );
+
+    } else {
+
+        authArea.innerHTML = `
+            <button
+                class="login-btn"
+                id="loginBtn"
+            >
+                로그인
+            </button>
+        `;
+
+        document
+            .getElementById("loginBtn")
+            ?.addEventListener(
+                "click",
+                openLoginModal
+            );
+    }
+}
+
+
+function logout() {
+
+    token = null;
+    currentUser = null;
+
+    localStorage.removeItem(
+        "pigsty_token"
+    );
+
+    updateAuthUI();
+}
+
+
+// =========================
+// Login
+// =========================
+
+async function login(
+    username,
+    password
+) {
+
+    const data = await apiFetch(
+        "/api/auth/login",
+        {
+            method: "POST",
+
+            body: JSON.stringify({
+                username,
+                password
+            })
+        }
+    );
+
+    token = data.access_token;
+
+    localStorage.setItem(
+        "pigsty_token",
+        token
+    );
+
+    await loadUser();
+
+    closeModal();
+
+    alert("로그인 성공!");
+}
+
+
+// =========================
+// Register
+// =========================
+
+async function register(
+    username,
+    password
+) {
+
+    await apiFetch(
+        "/api/auth/register",
+        {
+            method: "POST",
+
+            body: JSON.stringify({
+                username,
+                password
+            })
+        }
+    );
+
+    alert(
+        "회원가입 성공! 이제 로그인하세요."
+    );
+
+    showLoginForm();
+}
+
+
+// =========================
+// Posts
+// =========================
+
+async function loadPosts() {
+
+    const postsContainer =
+        document.getElementById(
+            "posts"
+        );
+
+    if (!postsContainer) return;
+
+    try {
+
+        const posts = await apiFetch(
+            "/api/posts"
+        );
+
+        if (!posts.length) {
+
+            postsContainer.innerHTML = `
+                <div class="empty-posts">
+                    <h3>아직 게시물이 없습니다.</h3>
+                    <p>
+                        첫 번째 게시물을 올려보세요.
+                    </p>
+                </div>
+            `;
+
+            return;
+        }
+
+        postsContainer.innerHTML =
+            posts.map(
+                createPostHTML
+            ).join("");
+
+        attachPostEvents();
+
+    } catch (error) {
+
+        postsContainer.innerHTML = `
+            <div class="empty-posts">
+                <h3>게시물을 불러오지 못했습니다.</h3>
+                <p>${escapeHtml(error.message)}</p>
+            </div>
+        `;
+    }
+}
+
+
+function createPostHTML(post) {
+
+    const tags = post.tags
+        ? post.tags
+            .split(",")
+            .map(tag => tag.trim())
+            .filter(Boolean)
+        : [];
+
+    return `
+        <article
+            class="post-card"
+            data-post-id="${post.id}"
+        >
+
+            <div class="post-top">
+
+                <span class="post-author">
+                    ${escapeHtml(post.author)}
+                </span>
+
+                <span class="post-date">
+                    ${formatDate(post.created_at)}
+                </span>
+
+            </div>
+
+            <h2 class="post-title">
+                ${escapeHtml(post.title)}
+            </h2>
+
+            <p class="post-content">
+                ${escapeHtml(post.content)}
+            </p>
+
+            ${
+                tags.length
+                ? `
+                    <div class="post-tags">
+                        ${
+                            tags.map(
+                                tag =>
+                                `<span>#${escapeHtml(tag)}</span>`
+                            ).join("")
+                        }
+                    </div>
+                `
+                : ""
+            }
+
+            <div class="post-actions">
+
+                <button
+                    class="like-btn"
+                    data-id="${post.id}"
+                >
+                    ♥ ${post.likes || 0}
+                </button>
+
+            </div>
+
+        </article>
+    `;
+}
+
+
+function attachPostEvents() {
+
+    document
+        .querySelectorAll(".like-btn")
+        .forEach(button => {
+
+            button.addEventListener(
+                "click",
+                async () => {
+
+                    try {
+
+                        const id =
+                            button.dataset.id;
+
+                        const result =
+                            await apiFetch(
+                                `/api/posts/${id}/like`,
+                                {
+                                    method: "POST"
+                                }
+                            );
+
+                        button.textContent =
+                            `♥ ${result.likes}`;
+
+                    } catch (error) {
+
+                        alert(
+                            error.message
+                        );
+                    }
+                }
+            );
+        });
+}
+
+
+// =========================
+// Create Post
+// =========================
+
+async function createPost(
+    title,
+    content,
+    tags
+) {
+
+    if (!token) {
+
+        alert(
+            "로그인이 필요합니다."
+        );
+
+        return;
+    }
+
+    await apiFetch(
+        "/api/posts",
+        {
+            method: "POST",
+
+            body: JSON.stringify({
+                title,
+                content,
+                tags
+            })
+        }
+    );
+
+    closeModal();
+
+    await loadPosts();
+
+    alert("게시물이 등록되었습니다!");
+}
+
+
+// =========================
+// Modal
+// =========================
+
+function openModal(content) {
+
+    let modal =
+        document.getElementById(
+            "modal"
+        );
+
+    if (!modal) {
+
+        modal =
+            document.createElement(
+                "div"
+            );
+
+        modal.id = "modal";
+
+        modal.className =
+            "modal";
+
+        document.body.appendChild(
+            modal
+        );
+    }
+
+    modal.innerHTML = content;
+
+    modal.classList.add(
+        "active"
+    );
+
+    modal
+        .querySelector(".close")
+        ?.addEventListener(
+            "click",
+            closeModal
+        );
+
+    modal.addEventListener(
+        "click",
+        event => {
+
+            if (
+                event.target === modal
+            ) {
+                closeModal();
+            }
+
+        },
+        {
+            once: true
+        }
+    );
+}
+
+
+function closeModal() {
+
+    const modal =
+        document.getElementById(
+            "modal"
+        );
+
+    if (modal) {
+
+        modal.classList.remove(
+            "active"
+        );
+
+        modal.innerHTML = "";
+    }
+}
+
+
+// =========================
+// Login Modal
+// =========================
+
+function openLoginModal() {
+
+    openModal(`
+        <div class="modal-box">
+
+            <button
+                class="close"
+            >
+                ×
+            </button>
+
+            <h2>로그인</h2>
+
+            <form id="loginForm">
+
+                <input
+                    id="loginUsername"
+                    type="text"
+                    placeholder="아이디"
+                    required
+                >
+
+                <input
+                    id="loginPassword"
+                    type="password"
+                    placeholder="비밀번호"
+                    required
+                >
+
+                <button
+                    class="submit"
+                    type="submit"
+                >
+                    로그인
+                </button>
+
+            </form>
+
+            <button
+                class="switch-auth"
+                id="registerSwitch"
+            >
+                계정이 없나요? 회원가입
+            </button>
+
+            <p
+                class="auth-message"
+                id="authMessage"
+            ></p>
+
+        </div>
+    `);
+
+
+    document
+        .getElementById("loginForm")
+        ?.addEventListener(
+            "submit",
+            async event => {
+
+                event.preventDefault();
+
+                const username =
+                    document
+                        .getElementById(
+                            "loginUsername"
+                        )
+                        .value;
+
+                const password =
+                    document
+                        .getElementById(
+                            "loginPassword"
+                        )
+                        .value;
+
+                try {
+
+                    await login(
+                        username,
+                        password
+                    );
+
+                } catch (error) {
+
+                    document
+                        .getElementById(
+                            "authMessage"
+                        )
+                        .textContent =
+                        error.message;
+                }
+            }
+        );
+
+
+    document
+        .getElementById(
+            "registerSwitch"
+        )
+        ?.addEventListener(
+            "click",
+            showRegisterForm
+        );
+}
+
+
+// =========================
+// Register Modal
+// =========================
+
+function showRegisterForm() {
+
+    openModal(`
+        <div class="modal-box">
+
+            <button
+                class="close"
+            >
+                ×
+            </button>
+
+            <h2>회원가입</h2>
+
+            <form id="registerForm">
+
+                <input
+                    id="registerUsername"
+                    type="text"
+                    placeholder="아이디"
+                    required
+                >
+
+                <input
+                    id="registerPassword"
+                    type="password"
+                    placeholder="비밀번호"
+                    required
+                >
+
+                <button
+                    class="submit"
+                    type="submit"
+                >
+                    회원가입
+                </button>
+
+            </form>
+
+            <button
+                class="switch-auth"
+                id="loginSwitch"
+            >
+                이미 계정이 있나요? 로그인
+            </button>
+
+            <p
+                class="auth-message"
+                id="authMessage"
+            ></p>
+
+        </div>
+    `);
+
+
+    document
+        .getElementById(
+            "registerForm"
+        )
+        ?.addEventListener(
+            "submit",
+            async event => {
+
+                event.preventDefault();
+
+                const username =
+                    document
+                        .getElementById(
+                            "registerUsername"
+                        )
+                        .value;
+
+                const password =
+                    document
+                        .getElementById(
+                            "registerPassword"
+                        )
+                        .value;
+
+                try {
+
+                    await register(
+                        username,
+                        password
+                    );
+
+                } catch (error) {
+
+                    document
+                        .getElementById(
+                            "authMessage"
+                        )
+                        .textContent =
+                        error.message;
+                }
+            }
+        );
+
+
+    document
+        .getElementById(
+            "loginSwitch"
+        )
+        ?.addEventListener(
+            "click",
+            openLoginModal
+        );
+}
+
+
+// =========================
+// Write Modal
+// =========================
+
+function openWriteModal() {
+
+    if (!currentUser) {
+
+        alert(
+            "로그인이 필요합니다."
+        );
+
+        openLoginModal();
+
+        return;
+    }
+
+
+    openModal(`
+        <div class="modal-box">
+
+            <button
+                class="close"
+            >
+                ×
+            </button>
+
+            <h2>게시물 작성</h2>
+
+            <form id="postForm">
+
+                <input
+                    id="postTitle"
+                    type="text"
+                    placeholder="제목"
+                    required
+                >
+
+                <textarea
+                    id="postContent"
+                    placeholder="내용을 작성하세요."
+                    required
+                ></textarea>
+
+                <input
+                    id="postTags"
+                    type="text"
+                    placeholder="태그 (쉼표로 구분)"
+                >
+
+                <button
+                    class="submit"
+                    type="submit"
+                >
+                    게시하기
+                </button>
+
+            </form>
+
+        </div>
+    `);
+
+
+    document
+        .getElementById("postForm")
+        ?.addEventListener(
+            "submit",
+            async event => {
+
+                event.preventDefault();
+
+                const title =
+                    document
+                        .getElementById(
+                            "postTitle"
+                        )
+                        .value;
+
+                const content =
+                    document
+                        .getElementById(
+                            "postContent"
+                        )
+                        .value;
+
+                const tags =
+                    document
+                        .getElementById(
+                            "postTags"
+                        )
+                        .value;
+
+                try {
+
+                    await createPost(
+                        title,
+                        content,
+                        tags
+                    );
+
+                } catch (error) {
+
+                    alert(
+                        error.message
+                    );
+                }
+            }
+        );
+}
+
+
+// =========================
+// Helpers
+// =========================
+
+function formatDate(dateString) {
+
+    if (!dateString) return "";
+
+    const date =
+        new Date(dateString);
+
+    return date.toLocaleString(
+        "ko-KR",
+        {
+            year: "numeric",
+            month: "numeric",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit"
+        }
+    );
+}
+
+
+function escapeHtml(value) {
+
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+
+// =========================
+// Page Events
+// =========================
+
+document.addEventListener(
+    "DOMContentLoaded",
+    async () => {
+
+        await loadUser();
+
+        await loadPosts();
+
+
+        document
+            .querySelector(".write-btn")
+            ?.addEventListener(
+                "click",
+                openWriteModal
+            );
+    }
+);
