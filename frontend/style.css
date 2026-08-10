@@ -1,3 +1,7 @@
+/* =========================================================
+   Reset
+========================================================= */
+
 * {
     box-sizing: border-box;
 }
@@ -12,6 +16,7 @@ body {
         -apple-system,
         BlinkMacSystemFont,
         "Segoe UI",
+        "Noto Sans KR",
         sans-serif;
 
     background: #f6f7f9;
@@ -19,29 +24,27 @@ body {
 }
 
 
-/* =========================
+/* =========================================================
    Header
-========================= */
+========================================================= */
 
 .header {
-    position: sticky;
-    top: 0;
-    z-index: 100;
-
-    height: 68px;
+    height: 70px;
 
     display: flex;
     align-items: center;
 
     padding: 0 40px;
 
-    background: rgba(255, 255, 255, 0.92);
+    background: #ffffff;
 
-    border-bottom: 1px solid #e8eaed;
+    border-bottom: 1px solid #e5e7eb;
 
-    backdrop-filter: blur(12px);
+    position: sticky;
+    top: 0;
+
+    z-index: 100;
 }
-
 
 .logo {
     font-size: 24px;
@@ -49,37 +52,35 @@ body {
 
     letter-spacing: -1px;
 
-    margin-right: 45px;
+    color: #111827;
 }
-
 
 nav {
     display: flex;
+
+    margin-left: 45px;
+
     gap: 28px;
 }
 
-
 nav a {
-    color: #777;
+    color: #6b7280;
 
     text-decoration: none;
 
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
 
     transition: 0.2s;
 }
 
-
 nav a:hover {
-    color: #111;
+    color: #111827;
 }
-
 
 nav a.active {
-    color: #111;
+    color: #111827;
 }
-
 
 .header-right {
     margin-left: auto;
@@ -87,9 +88,8 @@ nav a.active {
     display: flex;
     align-items: center;
 
-    gap: 12px;
+    gap: 14px;
 }
-
 
 .search-btn {
     width: 38px;
@@ -98,100 +98,88 @@ nav a.active {
     border: 0;
     border-radius: 10px;
 
-    background: #f1f3f4;
+    background: #f3f4f6;
 
-    font-size: 22px;
+    font-size: 23px;
 
     cursor: pointer;
 
     transition: 0.2s;
 }
 
-
 .search-btn:hover {
     background: #e5e7eb;
 }
 
-
 .login-btn {
+    border: 0;
+
     padding: 9px 16px;
 
-    border: 0;
-    border-radius: 10px;
+    border-radius: 9px;
 
-    background: #111;
+    background: #111827;
     color: white;
 
     font-size: 14px;
     font-weight: 700;
 
     cursor: pointer;
-
-    transition: 0.2s;
 }
-
 
 .login-btn:hover {
-    background: #333;
+    background: #374151;
 }
-
-
-/* =========================
-   User
-========================= */
 
 .user-menu {
     display: flex;
     align-items: center;
+
     gap: 12px;
 }
-
 
 .username {
     font-size: 14px;
     font-weight: 700;
-}
 
+    color: #374151;
+}
 
 .logout-btn {
-    padding: 8px 13px;
-
-    border: 1px solid #ddd;
-    border-radius: 9px;
+    border: 1px solid #e5e7eb;
 
     background: white;
-    color: #555;
+
+    padding: 8px 13px;
+
+    border-radius: 8px;
 
     font-size: 13px;
-    font-weight: 600;
 
     cursor: pointer;
-
-    transition: 0.2s;
 }
-
 
 .logout-btn:hover {
-    background: #f3f3f3;
+    background: #f3f4f6;
 }
 
 
-/* =========================
+/* =========================================================
    Main
-========================= */
+========================================================= */
 
 main {
-    width: min(1180px, calc(100% - 40px));
+    max-width: 1180px;
 
     margin: 0 auto;
 
-    padding: 45px 0 80px;
+    padding: 35px 25px 70px;
 }
 
 
-/* =========================
+/* =========================================================
    Welcome
-========================= */
+========================================================= */
 
 .welcome {
     display: flex;
@@ -199,33 +187,29 @@ main {
     align-items: center;
     justify-content: space-between;
 
-    padding: 45px;
+    padding: 35px 38px;
 
-    margin-bottom: 35px;
+    margin-bottom: 28px;
 
-    background: white;
+    background: #ffffff;
 
-    border: 1px solid #e8eaed;
+    border: 1px solid #e5e7eb;
 
-    border-radius: 22px;
-
-    box-shadow:
-        0 8px 30px rgba(0, 0, 0, 0.04);
+    border-radius: 18px;
 }
-
 
 .badge {
     display: inline-block;
 
-    padding: 6px 10px;
+    margin-bottom: 10px;
 
-    margin-bottom: 12px;
+    padding: 5px 10px;
 
-    border-radius: 7px;
+    border-radius: 999px;
 
-    background: #f1f3f4;
+    background: #f3f4f6;
 
-    color: #666;
+    color: #6b7280;
 
     font-size: 11px;
     font-weight: 800;
@@ -233,53 +217,50 @@ main {
     letter-spacing: 0.5px;
 }
 
-
 .welcome h1 {
-    margin: 0 0 10px;
+    margin: 0 0 9px;
 
-    font-size: 34px;
+    font-size: 28px;
 
-    letter-spacing: -1.5px;
+    letter-spacing: -1px;
 }
-
 
 .welcome p {
     margin: 0;
 
-    color: #777;
-
-    font-size: 15px;
-}
-
-
-.write-btn {
-    padding: 13px 21px;
-
-    border: 0;
-    border-radius: 12px;
-
-    background: #111;
-    color: white;
+    color: #6b7280;
 
     font-size: 14px;
-    font-weight: 800;
+}
+
+.write-btn {
+    border: 0;
+
+    padding: 13px 20px;
+
+    border-radius: 10px;
+
+    background: #111827;
+    color: #ffffff;
+
+    font-size: 14px;
+    font-weight: 700;
 
     cursor: pointer;
 
     transition: 0.2s;
 }
 
-
 .write-btn:hover {
-    background: #333;
+    background: #374151;
 
     transform: translateY(-1px);
 }
 
 
-/* =========================
+/* =========================================================
    Layout
-========================= */
+========================================================= */
 
 .layout {
     display: grid;
@@ -288,20 +269,17 @@ main {
         minmax(0, 1fr)
         290px;
 
-    gap: 30px;
-
-    align-items: start;
+    gap: 25px;
 }
 
 
-/* =========================
+/* =========================================================
    Feed
-========================= */
+========================================================= */
 
 .feed {
     min-width: 0;
 }
-
 
 .feed-header {
     display: flex;
@@ -309,9 +287,8 @@ main {
     align-items: center;
     justify-content: space-between;
 
-    margin-bottom: 18px;
+    margin-bottom: 15px;
 }
-
 
 .tabs {
     display: flex;
@@ -320,11 +297,10 @@ main {
 
     padding: 4px;
 
-    background: #eceef1;
+    background: #e9ebef;
 
     border-radius: 10px;
 }
-
 
 .tabs button {
     border: 0;
@@ -335,7 +311,7 @@ main {
 
     background: transparent;
 
-    color: #777;
+    color: #6b7280;
 
     font-size: 13px;
     font-weight: 700;
@@ -343,27 +319,25 @@ main {
     cursor: pointer;
 }
 
-
 .tabs button.selected {
-    background: white;
+    background: #ffffff;
 
-    color: #111;
+    color: #111827;
 
     box-shadow:
-        0 2px 6px rgba(0, 0, 0, 0.07);
+        0 1px 3px rgba(0, 0, 0, 0.08);
 }
-
 
 .feed-header select {
     padding: 8px 11px;
 
-    border: 1px solid #ddd;
+    border: 1px solid #e5e7eb;
 
-    border-radius: 9px;
+    border-radius: 8px;
 
-    background: white;
+    background: #ffffff;
 
-    color: #555;
+    color: #4b5563;
 
     font-size: 13px;
 
@@ -371,41 +345,38 @@ main {
 }
 
 
-/* =========================
+/* =========================================================
    Posts
-========================= */
+========================================================= */
 
 .posts {
     display: flex;
 
     flex-direction: column;
 
-    gap: 15px;
+    gap: 14px;
 }
-
 
 .post-card {
-    padding: 25px;
+    background: #ffffff;
 
-    background: white;
+    border: 1px solid #e5e7eb;
 
-    border: 1px solid #e7e9ec;
+    border-radius: 15px;
 
-    border-radius: 17px;
+    padding: 22px 24px;
 
     transition:
-        transform 0.2s,
-        box-shadow 0.2s;
+        transform 0.15s,
+        box-shadow 0.15s;
 }
-
 
 .post-card:hover {
     transform: translateY(-1px);
 
     box-shadow:
-        0 8px 25px rgba(0, 0, 0, 0.05);
+        0 5px 18px rgba(0, 0, 0, 0.05);
 }
-
 
 .post-top {
     display: flex;
@@ -416,40 +387,38 @@ main {
     margin-bottom: 12px;
 }
 
-
 .post-author {
     font-size: 13px;
 
-    font-weight: 800;
-}
+    font-weight: 700;
 
+    color: #374151;
+}
 
 .post-date {
-    color: #999;
-
     font-size: 12px;
-}
 
+    color: #9ca3af;
+}
 
 .post-title {
-    margin: 0 0 10px;
+    margin: 0 0 9px;
 
-    font-size: 20px;
+    font-size: 19px;
 
-    line-height: 1.35;
+    line-height: 1.4;
 
-    letter-spacing: -0.5px;
+    letter-spacing: -0.4px;
 }
-
 
 .post-content {
     margin: 0;
 
-    color: #555;
+    color: #4b5563;
 
     font-size: 14px;
 
-    line-height: 1.7;
+    line-height: 1.65;
 
     white-space: pre-wrap;
 
@@ -457,221 +426,354 @@ main {
 }
 
 
-/* =========================
+/* =========================================================
    Tags
-========================= */
+========================================================= */
 
 .post-tags {
     display: flex;
 
     flex-wrap: wrap;
 
-    gap: 7px;
+    gap: 6px;
 
-    margin-top: 17px;
+    margin-top: 15px;
 }
-
 
 .post-tags span {
     padding: 5px 9px;
 
     border-radius: 7px;
 
-    background: #f1f3f5;
+    background: #f3f4f6;
 
-    color: #666;
+    color: #6b7280;
 
-    font-size: 12px;
+    font-size: 11px;
+
+    font-weight: 600;
 }
 
 
-/* =========================
+/* =========================================================
+   Link Preview
+========================================================= */
+
+.link-preview {
+    display: block;
+
+    margin-top: 17px;
+
+    overflow: hidden;
+
+    border: 1px solid #e5e7eb;
+
+    border-radius: 12px;
+
+    background: #fafafa;
+
+    text-decoration: none;
+
+    color: inherit;
+
+    transition:
+        border-color 0.2s,
+        box-shadow 0.2s,
+        transform 0.2s;
+}
+
+.link-preview:hover {
+    border-color: #d1d5db;
+
+    box-shadow:
+        0 4px 14px rgba(0, 0, 0, 0.06);
+
+    transform: translateY(-1px);
+}
+
+
+/* YouTube */
+
+.youtube-preview {
+    background: #000000;
+}
+
+.youtube-thumbnail {
+    position: relative;
+
+    width: 100%;
+
+    aspect-ratio: 16 / 9;
+
+    overflow: hidden;
+}
+
+.youtube-thumbnail img {
+    width: 100%;
+    height: 100%;
+
+    display: block;
+
+    object-fit: cover;
+}
+
+.youtube-play {
+    position: absolute;
+
+    top: 50%;
+    left: 50%;
+
+    transform: translate(-50%, -50%);
+
+    width: 58px;
+    height: 41px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 12px;
+
+    background: rgba(255, 0, 0, 0.92);
+
+    color: white;
+
+    font-size: 22px;
+
+    padding-left: 3px;
+}
+
+.youtube-info {
+    padding: 13px 15px;
+
+    background: #ffffff;
+}
+
+.youtube-title {
+    margin: 0;
+
+    font-size: 14px;
+
+    font-weight: 700;
+
+    color: #111827;
+
+    line-height: 1.4;
+
+    overflow: hidden;
+
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+
+/* 일반 링크 */
+
+.generic-link-preview {
+    display: flex;
+
+    align-items: center;
+
+    gap: 12px;
+
+    padding: 15px;
+}
+
+.link-preview-icon {
+    width: 42px;
+    height: 42px;
+
+    flex-shrink: 0;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 9px;
+
+    background: #f3f4f6;
+
+    font-size: 20px;
+}
+
+.link-preview-info {
+    min-width: 0;
+}
+
+.link-preview-title {
+    margin: 0 0 4px;
+
+    font-size: 14px;
+
+    font-weight: 700;
+
+    color: #111827;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+}
+
+.link-preview-url {
+    margin: 0;
+
+    font-size: 12px;
+
+    color: #9ca3af;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+}
+
+
+/* =========================================================
    Post Actions
-========================= */
+========================================================= */
 
 .post-actions {
     display: flex;
 
     align-items: center;
 
-    gap: 8px;
+    gap: 7px;
 
-    margin-top: 20px;
+    margin-top: 18px;
 
     padding-top: 15px;
 
-    border-top: 1px solid #f0f1f2;
+    border-top: 1px solid #f0f1f3;
 }
 
-
-.like-btn {
-    padding: 7px 11px;
-
-    border: 1px solid #e2e4e7;
-
+.like-btn,
+.delete-btn,
+.ban-btn {
     border-radius: 8px;
 
-    background: white;
+    padding: 7px 11px;
 
-    color: #555;
-
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 700;
 
     cursor: pointer;
 
-    transition: 0.2s;
+    transition: 0.15s;
 }
 
+.like-btn {
+    border: 1px solid #e5e7eb;
+
+    background: #ffffff;
+
+    color: #6b7280;
+}
 
 .like-btn:hover {
-    background: #f7f7f7;
+    background: #f9fafb;
 
-    color: #111;
+    color: #ef4444;
 }
 
-
 .delete-btn {
-    padding: 7px 11px;
-
-    border: 1px solid #ffd2d2;
-
-    border-radius: 8px;
+    border: 1px solid #fecaca;
 
     background: #fff5f5;
 
-    color: #d33;
-
-    font-size: 13px;
-    font-weight: 700;
-
-    cursor: pointer;
-
-    transition: 0.2s;
+    color: #dc2626;
 }
-
 
 .delete-btn:hover {
-    background: #ffe5e5;
+    background: #fee2e2;
+}
 
-    border-color: #ffb5b5;
+.ban-btn {
+    border: 1px solid #fed7aa;
+
+    background: #fff7ed;
+
+    color: #ea580c;
+}
+
+.ban-btn:hover {
+    background: #ffedd5;
 }
 
 
-/* =========================
-   YouTube Preview
-========================= */
-
-.youtube-preview {
-    position: relative;
-
-    width: 100%;
-
-    max-width: 720px;
-
-    margin-top: 16px;
-
-    aspect-ratio: 16 / 9;
-
-    overflow: hidden;
-
-    border-radius: 14px;
-
-    background: #111;
-
-    box-shadow:
-        0 5px 20px rgba(0, 0, 0, 0.08);
-}
-
-
-.youtube-preview iframe {
-    width: 100%;
-    height: 100%;
-
-    display: block;
-
-    border: 0;
-}
-
-
-/* =========================
+/* =========================================================
    Empty
-========================= */
+========================================================= */
 
 .empty-posts {
-    padding: 55px 25px;
+    padding: 60px 20px;
 
     text-align: center;
 
-    background: white;
+    background: #ffffff;
 
-    border: 1px solid #e7e9ec;
+    border: 1px solid #e5e7eb;
 
-    border-radius: 17px;
+    border-radius: 15px;
 }
-
 
 .empty-posts h3 {
-    margin: 0 0 8px;
+    margin: 0 0 7px;
 
-    font-size: 17px;
+    font-size: 16px;
 }
-
 
 .empty-posts p {
     margin: 0;
 
-    color: #999;
+    color: #9ca3af;
 
     font-size: 13px;
 }
 
 
-/* =========================
+/* =========================================================
    Sidebar
-========================= */
+========================================================= */
 
 aside {
     display: flex;
 
     flex-direction: column;
 
-    gap: 15px;
+    gap: 14px;
 }
-
 
 .side-card {
-    padding: 22px;
+    padding: 20px;
 
-    background: white;
+    background: #ffffff;
 
-    border: 1px solid #e7e9ec;
+    border: 1px solid #e5e7eb;
 
-    border-radius: 16px;
+    border-radius: 14px;
 }
-
 
 .side-card h3 {
-    margin: 0 0 11px;
+    margin: 0 0 10px;
 
-    font-size: 16px;
+    font-size: 15px;
 }
-
 
 .side-card p {
     margin: 0;
 
-    color: #777;
+    color: #6b7280;
 
     font-size: 13px;
 
-    line-height: 1.7;
+    line-height: 1.65;
 }
-
-
-/* =========================
-   Tags Sidebar
-========================= */
 
 .tag-list {
     display: flex;
@@ -681,53 +783,41 @@ aside {
     gap: 7px;
 }
 
-
 .tag-list span {
     padding: 6px 9px;
 
     border-radius: 7px;
 
-    background: #f1f3f5;
+    background: #f3f4f6;
 
-    color: #666;
+    color: #6b7280;
 
-    font-size: 12px;
+    font-size: 11px;
+
+    font-weight: 600;
 }
-
-
-/* =========================
-   Warning
-========================= */
 
 .side-card.warning {
-    background: #fffaf0;
+    background: #fffaf3;
 
-    border-color: #f2e4c2;
+    border-color: #fed7aa;
 }
-
 
 .side-card.warning h3 {
-    color: #725b28;
+    color: #9a3412;
 }
 
 
-.side-card.warning p {
-    color: #806f48;
-}
-
-
-/* =========================
+/* =========================================================
    Modal
-========================= */
+========================================================= */
 
 .modal {
     position: fixed;
 
     inset: 0;
 
-    z-index: 1000;
-
-    display: flex;
+    display: none;
 
     align-items: center;
     justify-content: center;
@@ -736,99 +826,55 @@ aside {
 
     background: rgba(0, 0, 0, 0.45);
 
-    opacity: 0;
-
-    visibility: hidden;
-
-    transition:
-        opacity 0.2s,
-        visibility 0.2s;
+    z-index: 1000;
 }
-
 
 .modal.active {
-    opacity: 1;
-
-    visibility: visible;
+    display: flex;
 }
-
 
 .modal-box {
     position: relative;
 
-    width: min(450px, 100%);
+    width: 100%;
 
-    max-height: 90vh;
+    max-width: 460px;
 
-    overflow-y: auto;
+    padding: 28px;
 
-    padding: 30px;
+    border-radius: 16px;
 
-    background: white;
-
-    border-radius: 18px;
+    background: #ffffff;
 
     box-shadow:
         0 20px 60px rgba(0, 0, 0, 0.2);
-
-    animation:
-        modalIn 0.2s ease;
 }
 
+.modal-box h2 {
+    margin: 0 0 20px;
 
-@keyframes modalIn {
-
-    from {
-        opacity: 0;
-
-        transform:
-            translateY(10px)
-            scale(0.98);
-    }
-
-    to {
-        opacity: 1;
-
-        transform:
-            translateY(0)
-            scale(1);
-    }
+    font-size: 21px;
 }
-
 
 .modal-box .close {
     position: absolute;
 
-    top: 15px;
-    right: 17px;
+    top: 13px;
+    right: 15px;
 
     width: 32px;
     height: 32px;
 
     border: 0;
 
-    border-radius: 8px;
+    background: transparent;
 
-    background: #f3f4f5;
+    font-size: 24px;
 
-    color: #555;
-
-    font-size: 20px;
+    color: #6b7280;
 
     cursor: pointer;
 }
-
-
-.modal-box h2 {
-    margin: 0 0 22px;
-
-    font-size: 22px;
-}
-
-
-/* =========================
-   Forms
-========================= */
 
 .modal-box form {
     display: flex;
@@ -838,111 +884,80 @@ aside {
     gap: 11px;
 }
 
-
 .modal-box input,
 .modal-box textarea {
     width: 100%;
 
     padding: 12px 13px;
 
-    border: 1px solid #ddd;
+    border: 1px solid #e5e7eb;
 
-    border-radius: 10px;
+    border-radius: 9px;
 
-    background: white;
-
-    color: #222;
+    outline: none;
 
     font-family: inherit;
 
     font-size: 14px;
-
-    outline: none;
-
-    transition:
-        border-color 0.2s,
-        box-shadow 0.2s;
 }
-
 
 .modal-box input:focus,
 .modal-box textarea:focus {
-    border-color: #999;
-
-    box-shadow:
-        0 0 0 3px rgba(0, 0, 0, 0.05);
+    border-color: #9ca3af;
 }
-
 
 .modal-box textarea {
     min-height: 150px;
 
     resize: vertical;
-
-    line-height: 1.6;
 }
 
-
 .modal-box .submit {
-    margin-top: 5px;
+    margin-top: 4px;
 
     padding: 12px;
 
     border: 0;
 
-    border-radius: 10px;
+    border-radius: 9px;
 
-    background: #111;
+    background: #111827;
 
     color: white;
 
-    font-size: 14px;
-
-    font-weight: 800;
+    font-weight: 700;
 
     cursor: pointer;
-
-    transition: 0.2s;
 }
-
 
 .modal-box .submit:hover {
-    background: #333;
+    background: #374151;
 }
-
 
 .switch-auth {
     width: 100%;
 
-    margin-top: 15px;
-
-    padding: 9px;
+    margin-top: 14px;
 
     border: 0;
 
     background: transparent;
 
-    color: #777;
+    color: #6b7280;
 
     font-size: 13px;
 
     cursor: pointer;
 }
 
-
 .switch-auth:hover {
-    color: #111;
-
-    text-decoration: underline;
+    color: #111827;
 }
 
-
 .auth-message {
-    min-height: 20px;
+    margin: 10px 0 0;
 
-    margin: 12px 0 0;
-
-    color: #d33;
+    color: #dc2626;
 
     font-size: 13px;
 
@@ -950,9 +965,9 @@ aside {
 }
 
 
-/* =========================
-   Mobile
-========================= */
+/* =========================================================
+   Responsive
+========================================================= */
 
 @media (max-width: 850px) {
 
@@ -960,111 +975,97 @@ aside {
         padding: 0 20px;
     }
 
-
-    .logo {
-        margin-right: 25px;
-    }
-
-
     nav {
-        gap: 15px;
-    }
+        margin-left: 25px;
 
+        gap: 17px;
+    }
 
     .layout {
         grid-template-columns: 1fr;
     }
 
-
     aside {
         display: grid;
 
         grid-template-columns:
-            repeat(2, 1fr);
+            repeat(2, minmax(0, 1fr));
     }
+
 }
 
 
 @media (max-width: 600px) {
 
     .header {
-        height: 60px;
+        height: 62px;
 
         padding: 0 15px;
     }
 
-
     .logo {
-        margin-right: 15px;
-
-        font-size: 21px;
+        font-size: 20px;
     }
-
 
     nav {
         display: none;
     }
 
-
-    .search-btn {
+    .username {
         display: none;
     }
 
-
     main {
-        width: calc(100% - 24px);
-
-        padding-top: 20px;
+        padding: 20px 13px 50px;
     }
-
 
     .welcome {
         flex-direction: column;
 
         align-items: flex-start;
 
-        gap: 25px;
+        gap: 20px;
 
-        padding: 28px 23px;
+        padding: 25px;
     }
-
 
     .welcome h1 {
-        font-size: 27px;
+        font-size: 23px;
     }
-
 
     .write-btn {
         width: 100%;
     }
 
+    .post-card {
+        padding: 18px;
+    }
+
+    .post-title {
+        font-size: 17px;
+    }
+
+    .feed-header {
+        align-items: flex-start;
+
+        gap: 10px;
+    }
 
     aside {
         display: flex;
     }
 
+    .youtube-play {
+        width: 48px;
+        height: 34px;
 
-    .post-card {
-        padding: 20px;
-    }
+        border-radius: 9px;
 
-
-    .post-title {
         font-size: 18px;
     }
 
-
-    .post-content {
-        font-size: 14px;
-    }
-
-
-    .youtube-preview {
-        border-radius: 10px;
-    }
-
-
     .modal-box {
-        padding: 25px 20px;
+        padding: 24px 18px;
     }
+
 }
