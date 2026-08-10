@@ -1,12 +1,18 @@
 from datetime import datetime, timedelta, timezone
-import os
 
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from pydantic import BaseModel
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime
+from sqlalchemy import (
+    create_engine,
+    Column,
+    Integer,
+    String,
+    Text,
+    DateTime,
+)
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
 from passlib.context import CryptContext
@@ -17,13 +23,8 @@ import jwt
 # 설정
 # =========================================================
 
-SECRET_KEY = os.getenv(
-    "SECRET_KEY",
-    "pigsty-dev-secret-key-change-this"
-)
-
+SECRET_KEY = "pigsty-dev-secret-key-change-this"
 ALGORITHM = "HS256"
-
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
 
 DATABASE_URL = "sqlite:///./pigsty.db"
@@ -63,6 +64,7 @@ def get_db():
 # =========================================================
 
 class User(Base):
+
     __tablename__ = "users"
 
     id = Column(
@@ -83,8 +85,15 @@ class User(Base):
         nullable=False
     )
 
+    is_admin = Column(
+        Integer,
+        default=0,
+        nullable=False
+    )
+
 
 class Post(Base):
+
     __tablename__ = "posts"
 
     id = Column(
@@ -124,7 +133,9 @@ class Post(Base):
     )
 
 
-Base.metadata.create_all(bind=engine)
+Base.metadata.create_all(
+    bind=engine
+)
 
 
 # =========================================================
@@ -142,13 +153,17 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
+
     allow_origins=[
-        "https://pigsty.onrender.com",
         "http://127.0.0.1:5500",
         "http://localhost:5500",
+        "https://pigsty.onrender.com",
     ],
+
     allow_credentials=True,
+
     allow_methods=["*"],
+
     allow_headers=["*"],
 )
 
@@ -184,7 +199,9 @@ def verify_password(
 security = HTTPBearer()
 
 
-def create_access_token(username: str):
+def create_access_token(
+    username: str
+):
 
     expire = (
         datetime.now(timezone.utc)
@@ -206,13 +223,17 @@ def create_access_token(username: str):
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db)
+    credentials: HTTPAuthorizationCredentials =
+        Depends(security),
+
+    db: Session =
+        Depends(get_db)
 ):
 
     token = credentials.credentials
 
     try:
+
         payload = jwt.decode(
             token,
             SECRET_KEY,
@@ -228,12 +249,14 @@ def get_current_user(
             )
 
     except jwt.ExpiredSignatureError:
+
         raise HTTPException(
             status_code=401,
             detail="Token expired"
         )
 
     except jwt.InvalidTokenError:
+
         raise HTTPException(
             status_code=401,
             detail="Invalid token"
@@ -244,6 +267,7 @@ def get_current_user(
     ).first()
 
     if not user:
+
         raise HTTPException(
             status_code=401,
             detail="User not found"
@@ -257,18 +281,25 @@ def get_current_user(
 # =========================================================
 
 class RegisterRequest(BaseModel):
+
     username: str
+
     password: str
 
 
 class LoginRequest(BaseModel):
+
     username: str
+
     password: str
 
 
 class PostCreate(BaseModel):
+
     title: str
+
     content: str
+
     tags: str = ""
 
 
@@ -278,6 +309,7 @@ class PostCreate(BaseModel):
 
 @app.get("/")
 def root():
+
     return {
         "message": "PIGSTY API is running"
     }
@@ -287,22 +319,29 @@ def root():
 # Auth - Register
 # =========================================================
 
-@app.post("/api/auth/register")
+@app.post(
+    "/api/auth/register"
+)
 def register(
     request: RegisterRequest,
-    db: Session = Depends(get_db)
+
+    db: Session =
+        Depends(get_db)
 ):
 
     username = request.username.strip()
+
     password = request.password
 
     if len(username) < 2:
+
         raise HTTPException(
             status_code=400,
             detail="사용자 이름은 2자 이상이어야 합니다."
         )
 
     if len(password) < 4:
+
         raise HTTPException(
             status_code=400,
             detail="비밀번호는 4자 이상이어야 합니다."
@@ -313,6 +352,7 @@ def register(
     ).first()
 
     if existing:
+
         raise HTTPException(
             status_code=400,
             detail="이미 존재하는 사용자 이름입니다."
@@ -320,11 +360,16 @@ def register(
 
     user = User(
         username=username,
-        password_hash=hash_password(password)
+        password_hash=hash_password(
+            password
+        ),
+        is_admin=0
     )
 
     db.add(user)
+
     db.commit()
+
     db.refresh(user)
 
     return {
@@ -337,10 +382,14 @@ def register(
 # Auth - Login
 # =========================================================
 
-@app.post("/api/auth/login")
+@app.post(
+    "/api/auth/login"
+)
 def login(
     request: LoginRequest,
-    db: Session = Depends(get_db)
+
+    db: Session =
+        Depends(get_db)
 ):
 
     user = db.query(User).filter(
@@ -348,6 +397,7 @@ def login(
     ).first()
 
     if not user:
+
         raise HTTPException(
             status_code=401,
             detail="아이디 또는 비밀번호가 올바르지 않습니다."
@@ -357,6 +407,7 @@ def login(
         request.password,
         user.password_hash
     ):
+
         raise HTTPException(
             status_code=401,
             detail="아이디 또는 비밀번호가 올바르지 않습니다."
@@ -376,14 +427,62 @@ def login(
 # Auth - Me
 # =========================================================
 
-@app.get("/api/auth/me")
+@app.get(
+    "/api/auth/me"
+)
 def me(
-    current_user: User = Depends(get_current_user)
+    current_user: User =
+        Depends(get_current_user)
 ):
 
     return {
         "id": current_user.id,
-        "username": current_user.username
+        "username": current_user.username,
+        "is_admin": current_user.is_admin
+    }
+
+
+# =========================================================
+# 임시 관리자 지정
+# =========================================================
+# 사용법:
+# 1. admin 계정을 일반 회원가입
+# 2. Swagger에서 POST /api/admin/make-admin/{username}
+# 3. username에 admin 입력
+# 4. 관리자 지정 완료 후 이 API는 삭제할 것
+# =========================================================
+
+@app.post(
+    "/api/admin/make-admin/{username}"
+)
+def make_admin(
+    username: str,
+
+    db: Session =
+        Depends(get_db)
+):
+
+    user = db.query(User).filter(
+        User.username == username
+    ).first()
+
+    if not user:
+
+        raise HTTPException(
+            status_code=404,
+            detail="사용자를 찾을 수 없습니다."
+        )
+
+    user.is_admin = 1
+
+    db.commit()
+
+    db.refresh(user)
+
+    return {
+        "message": "관리자로 지정되었습니다.",
+        "username": user.username,
+        "is_admin": user.is_admin
     }
 
 
@@ -391,9 +490,12 @@ def me(
 # Posts - Get
 # =========================================================
 
-@app.get("/api/posts")
+@app.get(
+    "/api/posts"
+)
 def get_posts(
-    db: Session = Depends(get_db)
+    db: Session =
+        Depends(get_db)
 ):
 
     posts = db.query(Post).order_by(
@@ -401,6 +503,7 @@ def get_posts(
     ).all()
 
     return [
+
         {
             "id": post.id,
             "title": post.title,
@@ -408,13 +511,14 @@ def get_posts(
             "tags": post.tags or "",
             "author": post.author,
             "likes": post.likes or 0,
-            "created_at": (
+            "created_at":
                 post.created_at.isoformat()
                 if post.created_at
-                else None
-            ),
+                else None,
         }
+
         for post in posts
+
     ]
 
 
@@ -422,49 +526,119 @@ def get_posts(
 # Posts - Create
 # =========================================================
 
-@app.post("/api/posts")
+@app.post(
+    "/api/posts"
+)
 def create_post(
     request: PostCreate,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+
+    current_user: User =
+        Depends(get_current_user),
+
+    db: Session =
+        Depends(get_db)
 ):
 
     title = request.title.strip()
+
     content = request.content.strip()
+
     tags = request.tags.strip()
 
     if not title:
+
         raise HTTPException(
             status_code=400,
             detail="제목을 입력해주세요."
         )
 
     if not content:
+
         raise HTTPException(
             status_code=400,
             detail="내용을 입력해주세요."
         )
 
     post = Post(
+
         title=title,
+
         content=content,
+
         tags=tags,
+
         author=current_user.username,
+
         likes=0
     )
 
     db.add(post)
+
     db.commit()
+
     db.refresh(post)
 
     return {
+
         "id": post.id,
+
         "title": post.title,
+
         "content": post.content,
+
         "tags": post.tags,
+
         "author": post.author,
+
         "likes": post.likes,
-        "created_at": post.created_at.isoformat()
+
+        "created_at":
+            post.created_at.isoformat()
+    }
+
+
+# =========================================================
+# Posts - Delete
+# =========================================================
+
+@app.delete(
+    "/api/posts/{post_id}"
+)
+def delete_post(
+    post_id: int,
+
+    current_user: User =
+        Depends(get_current_user),
+
+    db: Session =
+        Depends(get_db)
+):
+
+    # 관리자만 삭제 가능
+    if current_user.is_admin != 1:
+
+        raise HTTPException(
+            status_code=403,
+            detail="관리자만 게시글을 삭제할 수 있습니다."
+        )
+
+    post = db.query(Post).filter(
+        Post.id == post_id
+    ).first()
+
+    if not post:
+
+        raise HTTPException(
+            status_code=404,
+            detail="게시물을 찾을 수 없습니다."
+        )
+
+    db.delete(post)
+
+    db.commit()
+
+    return {
+        "message": "게시글이 삭제되었습니다."
     }
 
 
@@ -472,10 +646,14 @@ def create_post(
 # Likes
 # =========================================================
 
-@app.post("/api/posts/{post_id}/like")
+@app.post(
+    "/api/posts/{post_id}/like"
+)
 def like_post(
     post_id: int,
-    db: Session = Depends(get_db)
+
+    db: Session =
+        Depends(get_db)
 ):
 
     post = db.query(Post).filter(
@@ -483,6 +661,7 @@ def like_post(
     ).first()
 
     if not post:
+
         raise HTTPException(
             status_code=404,
             detail="게시물을 찾을 수 없습니다."
@@ -493,6 +672,7 @@ def like_post(
     ) + 1
 
     db.commit()
+
     db.refresh(post)
 
     return {
