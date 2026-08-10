@@ -143,9 +143,9 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "https://pigsty.onrender.com",
         "http://127.0.0.1:5500",
         "http://localhost:5500",
-        "https://pigsty.onrender.com",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -284,7 +284,7 @@ def root():
 
 
 # =========================================================
-# Auth
+# Auth - Register
 # =========================================================
 
 @app.post("/api/auth/register")
@@ -333,6 +333,10 @@ def register(
     }
 
 
+# =========================================================
+# Auth - Login
+# =========================================================
+
 @app.post("/api/auth/login")
 def login(
     request: LoginRequest,
@@ -368,6 +372,10 @@ def login(
     }
 
 
+# =========================================================
+# Auth - Me
+# =========================================================
+
 @app.get("/api/auth/me")
 def me(
     current_user: User = Depends(get_current_user)
@@ -380,7 +388,7 @@ def me(
 
 
 # =========================================================
-# Posts
+# Posts - Get
 # =========================================================
 
 @app.get("/api/posts")
@@ -409,6 +417,10 @@ def get_posts(
         for post in posts
     ]
 
+
+# =========================================================
+# Posts - Create
+# =========================================================
 
 @app.post("/api/posts")
 def create_post(
