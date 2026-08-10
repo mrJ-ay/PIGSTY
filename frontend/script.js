@@ -3,14 +3,12 @@ const API = "https://pigsty-backend.onrender.com";
 let token = localStorage.getItem("pigsty_token");
 let currentUser = null;
 
-
 // =========================
 // DOM
 // =========================
 
 const authArea = document.getElementById("authArea");
 const loginBtn = document.getElementById("loginBtn");
-
 
 // =========================
 // API
@@ -52,7 +50,6 @@ async function apiFetch(url, options = {}) {
     return data;
 }
 
-
 // =========================
 // Auth
 // =========================
@@ -60,11 +57,8 @@ async function apiFetch(url, options = {}) {
 async function loadUser() {
 
     if (!token) {
-
         currentUser = null;
-
         updateAuthUI();
-
         return;
     }
 
@@ -77,7 +71,6 @@ async function loadUser() {
     } catch {
 
         token = null;
-
         currentUser = null;
 
         localStorage.removeItem(
@@ -87,7 +80,6 @@ async function loadUser() {
 
     updateAuthUI();
 }
-
 
 function updateAuthUI() {
 
@@ -141,11 +133,9 @@ function updateAuthUI() {
     }
 }
 
-
 function logout() {
 
     token = null;
-
     currentUser = null;
 
     localStorage.removeItem(
@@ -156,7 +146,6 @@ function logout() {
 
     loadPosts("latest");
 }
-
 
 // =========================
 // Login
@@ -193,7 +182,6 @@ async function login(
     alert("로그인 성공!");
 }
 
-
 // =========================
 // Register
 // =========================
@@ -222,7 +210,6 @@ async function register(
     openLoginModal();
 }
 
-
 // =========================
 // Posts
 // =========================
@@ -244,11 +231,6 @@ async function loadPosts(
             "/api/posts"
         );
 
-
-        // =========================
-        // Empty
-        // =========================
-
         if (!posts.length) {
 
             postsContainer.innerHTML = `
@@ -268,11 +250,7 @@ async function loadPosts(
             return;
         }
 
-
-        // =========================
         // 최신순
-        // =========================
-
         if (sort === "latest") {
 
             posts.sort(
@@ -287,11 +265,7 @@ async function loadPosts(
             );
         }
 
-
-        // =========================
         // 인기순
-        // =========================
-
         if (sort === "popular") {
 
             posts.sort(
@@ -301,19 +275,11 @@ async function loadPosts(
                         (b.likes || 0) -
                         (a.likes || 0);
 
-
-                    // 좋아요 수가 다르면
-                    // 좋아요 많은 글 우선
-
                     if (
                         likeDifference !== 0
                     ) {
                         return likeDifference;
                     }
-
-
-                    // 좋아요가 같으면
-                    // 최신 글 우선
 
                     return (
                         new Date(b.created_at) -
@@ -324,16 +290,10 @@ async function loadPosts(
             );
         }
 
-
-        // =========================
-        // Render
-        // =========================
-
         postsContainer.innerHTML =
             posts
                 .map(createPostHTML)
                 .join("");
-
 
         attachPostEvents();
 
@@ -355,6 +315,148 @@ async function loadPosts(
     }
 }
 
+// =========================
+// YouTube
+// =========================
+
+function getYouTubeId(url) {
+
+    if (!url) return null;
+
+    const patterns = [
+
+        /youtube\.com\/watch\?v=([^&\s]+)/i,
+
+        /youtube\.com\/shorts\/([^?&\s]+)/i,
+
+        /youtu\.be\/([^?&\s]+)/i,
+
+        /youtube\.com\/embed\/([^?&\s]+)/i
+
+    ];
+
+    for (const pattern of patterns) {
+
+        const match = url.match(pattern);
+
+        if (match) {
+            return match[1];
+        }
+    }
+
+    return null;
+}
+
+function createYouTubePreview(content) {
+
+    const urlRegex =
+        /https?:\/\/[^\s<]+/gi;
+
+    const urls =
+        content.match(urlRegex) || [];
+
+    for (const rawUrl of urls) {
+
+        const cleanUrl =
+            rawUrl.replace(
+                /[)\]}>.,!?]+$/,
+                ""
+            );
+
+        const videoId =
+            getYouTubeId(
+                cleanUrl
+            );
+
+        if (videoId) {
+
+            return `
+                <div class="youtube-preview">
+
+                    <iframe
+                        src="https://www.youtube.com/embed/${encodeURIComponent(videoId)}"
+                        title="YouTube video"
+                        frameborder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowfullscreen
+                        loading="lazy"
+                    ></iframe>
+
+                </div>
+            `;
+        }
+    }
+
+    return "";
+}
+
+// =========================
+// Link Preview
+// =========================
+
+function createLinkPreview(content) {
+
+    const urlRegex =
+        /https?:\/\/[^\s<]+/gi;
+
+    const urls =
+        content.match(urlRegex) || [];
+
+    const uniqueUrls =
+        [...new Set(urls)];
+
+    return uniqueUrls
+        .map(rawUrl => {
+
+            const url =
+                rawUrl.replace(
+                    /[)\]}>.,!?]+$/,
+                    ""
+                );
+
+            if (
+                getYouTubeId(url)
+            ) {
+                return "";
+            }
+
+            let hostname = "";
+
+            try {
+                hostname =
+                    new URL(url).hostname;
+            } catch {
+                return "";
+            }
+
+            return `
+                <a
+                    class="link-preview"
+                    href="${escapeHtml(url)}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    <span class="link-preview-icon">
+                        🔗
+                    </span>
+
+                    <span class="link-preview-text">
+
+                        <strong>
+                            ${escapeHtml(hostname)}
+                        </strong>
+
+                        <small>
+                            ${escapeHtml(url)}
+                        </small>
+
+                    </span>
+                </a>
+            `;
+
+        })
+        .join("");
+}
 
 // =========================
 // Create Post HTML
@@ -371,6 +473,29 @@ function createPostHTML(post) {
             .filter(Boolean)
         : [];
 
+    const youtubePreview =
+        createYouTubePreview(
+            post.content
+        );
+
+    const linkPreview =
+        createLinkPreview(
+            post.content
+        );
+
+    const adminDeleteButton =
+        currentUser &&
+        Number(currentUser.is_admin) === 1
+            ? `
+                <button
+                    class="delete-btn"
+                    data-id="${post.id}"
+                    type="button"
+                >
+                    삭제
+                </button>
+            `
+            : "";
 
     return `
         <article
@@ -392,38 +517,46 @@ function createPostHTML(post) {
 
             </div>
 
-
             <h2 class="post-title">
                 ${escapeHtml(post.title)}
             </h2>
-
 
             <p class="post-content">
                 ${escapeHtml(post.content)}
             </p>
 
+            ${youtubePreview}
+
+            ${
+                linkPreview
+                    ? `
+                        <div class="post-links">
+                            ${linkPreview}
+                        </div>
+                    `
+                    : ""
+            }
 
             ${
                 tags.length
-                ? `
-                    <div class="post-tags">
+                    ? `
+                        <div class="post-tags">
 
-                        ${
-                            tags
-                                .map(
-                                    tag =>
-                                    `<span>
-                                        #${escapeHtml(tag)}
-                                    </span>`
-                                )
-                                .join("")
-                        }
+                            ${
+                                tags
+                                    .map(
+                                        tag =>
+                                        `<span>
+                                            #${escapeHtml(tag)}
+                                        </span>`
+                                    )
+                                    .join("")
+                            }
 
-                    </div>
-                `
-                : ""
+                        </div>
+                    `
+                    : ""
             }
-
 
             <div class="post-actions">
 
@@ -435,12 +568,13 @@ function createPostHTML(post) {
                     ♥ ${post.likes || 0}
                 </button>
 
+                ${adminDeleteButton}
+
             </div>
 
         </article>
     `;
 }
-
 
 // =========================
 // Post Events
@@ -448,6 +582,7 @@ function createPostHTML(post) {
 
 function attachPostEvents() {
 
+    // 좋아요
     document
         .querySelectorAll(".like-btn")
         .forEach(
@@ -462,7 +597,6 @@ function attachPostEvents() {
                             const id =
                                 button.dataset.id;
 
-
                             const result =
                                 await apiFetch(
                                     `/api/posts/${id}/like`,
@@ -471,10 +605,58 @@ function attachPostEvents() {
                                     }
                                 );
 
-
                             button.textContent =
                                 `♥ ${result.likes}`;
 
+                        } catch (error) {
+
+                            alert(
+                                error.message
+                            );
+                        }
+                    }
+                );
+            }
+        );
+
+    // 관리자 삭제
+    document
+        .querySelectorAll(".delete-btn")
+        .forEach(
+            button => {
+
+                button.addEventListener(
+                    "click",
+                    async () => {
+
+                        const id =
+                            button.dataset.id;
+
+                        const confirmed =
+                            confirm(
+                                "정말 이 게시글을 삭제하시겠습니까?"
+                            );
+
+                        if (!confirmed) {
+                            return;
+                        }
+
+                        try {
+
+                            await apiFetch(
+                                `/api/posts/${id}`,
+                                {
+                                    method: "DELETE"
+                                }
+                            );
+
+                            alert(
+                                "게시글이 삭제되었습니다."
+                            );
+
+                            await loadPosts(
+                                "latest"
+                            );
 
                         } catch (error) {
 
@@ -487,7 +669,6 @@ function attachPostEvents() {
             }
         );
 }
-
 
 // =========================
 // Create Post
@@ -508,7 +689,6 @@ async function createPost(
         return;
     }
 
-
     await apiFetch(
         "/api/posts",
         {
@@ -522,20 +702,16 @@ async function createPost(
         }
     );
 
-
     closeModal();
-
 
     await loadPosts(
         "latest"
     );
 
-
     alert(
         "게시물이 등록되었습니다!"
     );
 }
-
 
 // =========================
 // Modal
@@ -547,7 +723,6 @@ function openModal(content) {
         document.getElementById(
             "modal"
         );
-
 
     if (!modal) {
 
@@ -565,13 +740,11 @@ function openModal(content) {
         );
     }
 
-
     modal.innerHTML = content;
 
     modal.classList.add(
         "active"
     );
-
 
     modal
         .querySelector(".close")
@@ -579,7 +752,6 @@ function openModal(content) {
             "click",
             closeModal
         );
-
 
     modal.addEventListener(
         "click",
@@ -599,14 +771,12 @@ function openModal(content) {
     );
 }
 
-
 function closeModal() {
 
     const modal =
         document.getElementById(
             "modal"
         );
-
 
     if (modal) {
 
@@ -617,7 +787,6 @@ function closeModal() {
         modal.innerHTML = "";
     }
 }
-
 
 // =========================
 // Login Modal
@@ -636,11 +805,9 @@ function openLoginModal() {
                 ×
             </button>
 
-
             <h2>
                 로그인
             </h2>
-
 
             <form id="loginForm">
 
@@ -651,14 +818,12 @@ function openLoginModal() {
                     required
                 >
 
-
                 <input
                     id="loginPassword"
                     type="password"
                     placeholder="비밀번호"
                     required
                 >
-
 
                 <button
                     class="submit"
@@ -669,7 +834,6 @@ function openLoginModal() {
 
             </form>
 
-
             <button
                 class="switch-auth"
                 id="registerSwitch"
@@ -677,7 +841,6 @@ function openLoginModal() {
             >
                 계정이 없나요? 회원가입
             </button>
-
 
             <p
                 class="auth-message"
@@ -688,7 +851,6 @@ function openLoginModal() {
 
     `);
 
-
     document
         .getElementById("loginForm")
         ?.addEventListener(
@@ -697,7 +859,6 @@ function openLoginModal() {
 
                 event.preventDefault();
 
-
                 const username =
                     document
                         .getElementById(
@@ -705,14 +866,12 @@ function openLoginModal() {
                         )
                         .value;
 
-
                 const password =
                     document
                         .getElementById(
                             "loginPassword"
                         )
                         .value;
-
 
                 try {
 
@@ -733,7 +892,6 @@ function openLoginModal() {
             }
         );
 
-
     document
         .getElementById(
             "registerSwitch"
@@ -743,7 +901,6 @@ function openLoginModal() {
             showRegisterForm
         );
 }
-
 
 // =========================
 // Register Modal
@@ -762,11 +919,9 @@ function showRegisterForm() {
                 ×
             </button>
 
-
             <h2>
                 회원가입
             </h2>
-
 
             <form id="registerForm">
 
@@ -777,14 +932,12 @@ function showRegisterForm() {
                     required
                 >
 
-
                 <input
                     id="registerPassword"
                     type="password"
                     placeholder="비밀번호"
                     required
                 >
-
 
                 <button
                     class="submit"
@@ -795,7 +948,6 @@ function showRegisterForm() {
 
             </form>
 
-
             <button
                 class="switch-auth"
                 id="loginSwitch"
@@ -803,7 +955,6 @@ function showRegisterForm() {
             >
                 이미 계정이 있나요? 로그인
             </button>
-
 
             <p
                 class="auth-message"
@@ -813,7 +964,6 @@ function showRegisterForm() {
         </div>
 
     `);
-
 
     document
         .getElementById(
@@ -825,7 +975,6 @@ function showRegisterForm() {
 
                 event.preventDefault();
 
-
                 const username =
                     document
                         .getElementById(
@@ -833,14 +982,12 @@ function showRegisterForm() {
                         )
                         .value;
 
-
                 const password =
                     document
                         .getElementById(
                             "registerPassword"
                         )
                         .value;
-
 
                 try {
 
@@ -861,7 +1008,6 @@ function showRegisterForm() {
             }
         );
 
-
     document
         .getElementById(
             "loginSwitch"
@@ -871,7 +1017,6 @@ function showRegisterForm() {
             openLoginModal
         );
 }
-
 
 // =========================
 // Write Modal
@@ -890,7 +1035,6 @@ function openWriteModal() {
         return;
     }
 
-
     openModal(`
 
         <div class="modal-box">
@@ -902,11 +1046,9 @@ function openWriteModal() {
                 ×
             </button>
 
-
             <h2>
                 게시물 작성
             </h2>
-
 
             <form id="postForm">
 
@@ -917,20 +1059,17 @@ function openWriteModal() {
                     required
                 >
 
-
                 <textarea
                     id="postContent"
-                    placeholder="내용을 작성하세요."
+                    placeholder="내용을 작성하세요.&#10;&#10;YouTube 링크를 넣으면 자동으로 영상 미리보기가 표시됩니다."
                     required
                 ></textarea>
-
 
                 <input
                     id="postTags"
                     type="text"
                     placeholder="태그 (쉼표로 구분)"
                 >
-
 
                 <button
                     class="submit"
@@ -945,7 +1084,6 @@ function openWriteModal() {
 
     `);
 
-
     document
         .getElementById(
             "postForm"
@@ -956,14 +1094,12 @@ function openWriteModal() {
 
                 event.preventDefault();
 
-
                 const title =
                     document
                         .getElementById(
                             "postTitle"
                         )
                         .value;
-
 
                 const content =
                     document
@@ -972,14 +1108,12 @@ function openWriteModal() {
                         )
                         .value;
 
-
                 const tags =
                     document
                         .getElementById(
                             "postTags"
                         )
                         .value;
-
 
                 try {
 
@@ -999,7 +1133,6 @@ function openWriteModal() {
         );
 }
 
-
 // =========================
 // Helpers
 // =========================
@@ -1010,10 +1143,8 @@ function formatDate(
 
     if (!dateString) return "";
 
-
     const date =
         new Date(dateString);
-
 
     return date.toLocaleString(
         "ko-KR",
@@ -1026,7 +1157,6 @@ function formatDate(
         }
     );
 }
-
 
 function escapeHtml(
     value
@@ -1057,7 +1187,6 @@ function escapeHtml(
         );
 }
 
-
 // =========================
 // Page Events
 // =========================
@@ -1072,16 +1201,11 @@ document.addEventListener(
             "latest"
         );
 
-
-        // =========================
         // 최신 / 인기 탭
-        // =========================
-
         const tabs =
             document.querySelectorAll(
                 ".tabs button"
             );
-
 
         tabs.forEach(
             (button, index) => {
@@ -1100,11 +1224,9 @@ document.addEventListener(
                             }
                         );
 
-
                         button.classList.add(
                             "selected"
                         );
-
 
                         if (index === 0) {
 
@@ -1125,16 +1247,11 @@ document.addEventListener(
             }
         );
 
-
-        // =========================
         // 정렬 Select
-        // =========================
-
         const sortSelect =
             document.querySelector(
                 ".feed-header select"
             );
-
 
         sortSelect?.addEventListener(
             "change",
@@ -1149,7 +1266,6 @@ document.addEventListener(
                         "popular"
                     );
 
-
                     tabs.forEach(
                         btn => {
 
@@ -1159,7 +1275,6 @@ document.addEventListener(
 
                         }
                     );
-
 
                     tabs[1]
                         ?.classList.add(
@@ -1172,7 +1287,6 @@ document.addEventListener(
                         "latest"
                     );
 
-
                     tabs.forEach(
                         btn => {
 
@@ -1183,7 +1297,6 @@ document.addEventListener(
                         }
                     );
 
-
                     tabs[0]
                         ?.classList.add(
                             "selected"
@@ -1193,11 +1306,7 @@ document.addEventListener(
             }
         );
 
-
-        // =========================
         // 글쓰기
-        // =========================
-
         document
             .querySelector(
                 ".write-btn"
