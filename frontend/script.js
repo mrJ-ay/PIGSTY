@@ -9,6 +9,7 @@ let currentUser = null;
 // =========================
 
 const authArea = document.getElementById("authArea");
+const loginBtn = document.getElementById("loginBtn");
 
 
 // =========================
@@ -59,8 +60,11 @@ async function apiFetch(url, options = {}) {
 async function loadUser() {
 
     if (!token) {
+
         currentUser = null;
+
         updateAuthUI();
+
         return;
     }
 
@@ -73,6 +77,7 @@ async function loadUser() {
     } catch {
 
         token = null;
+
         currentUser = null;
 
         localStorage.removeItem(
@@ -140,6 +145,7 @@ function updateAuthUI() {
 function logout() {
 
     token = null;
+
     currentUser = null;
 
     localStorage.removeItem(
@@ -147,7 +153,8 @@ function logout() {
     );
 
     updateAuthUI();
-    loadPosts();
+
+    loadPosts("latest");
 }
 
 
@@ -183,8 +190,6 @@ async function login(
 
     closeModal();
 
-    await loadPosts();
-
     alert("로그인 성공!");
 }
 
@@ -219,13 +224,17 @@ async function register(
 
 
 // =========================
-// Posts - Get
+// Posts
 // =========================
 
-async function loadPosts() {
+async function loadPosts(
+    sort = "latest"
+) {
 
     const postsContainer =
-        document.getElementById("posts");
+        document.getElementById(
+            "posts"
+        );
 
     if (!postsContainer) return;
 
@@ -234,6 +243,11 @@ async function loadPosts() {
         const posts = await apiFetch(
             "/api/posts"
         );
+
+
+        // =========================
+        // Empty
+        // =========================
 
         if (!posts.length) {
 
@@ -254,10 +268,72 @@ async function loadPosts() {
             return;
         }
 
+
+        // =========================
+        // 최신순
+        // =========================
+
+        if (sort === "latest") {
+
+            posts.sort(
+                (a, b) => {
+
+                    return (
+                        new Date(b.created_at) -
+                        new Date(a.created_at)
+                    );
+
+                }
+            );
+        }
+
+
+        // =========================
+        // 인기순
+        // =========================
+
+        if (sort === "popular") {
+
+            posts.sort(
+                (a, b) => {
+
+                    const likeDifference =
+                        (b.likes || 0) -
+                        (a.likes || 0);
+
+
+                    // 좋아요 수가 다르면
+                    // 좋아요 많은 글 우선
+
+                    if (
+                        likeDifference !== 0
+                    ) {
+                        return likeDifference;
+                    }
+
+
+                    // 좋아요가 같으면
+                    // 최신 글 우선
+
+                    return (
+                        new Date(b.created_at) -
+                        new Date(a.created_at)
+                    );
+
+                }
+            );
+        }
+
+
+        // =========================
+        // Render
+        // =========================
+
         postsContainer.innerHTML =
             posts
                 .map(createPostHTML)
                 .join("");
+
 
         attachPostEvents();
 
@@ -289,25 +365,11 @@ function createPostHTML(post) {
     const tags = post.tags
         ? post.tags
             .split(",")
-            .map(tag => tag.trim())
+            .map(
+                tag => tag.trim()
+            )
             .filter(Boolean)
         : [];
-
-
-    // 관리자에게만 삭제 버튼 표시
-    const deleteButton =
-        currentUser &&
-        Number(currentUser.is_admin) === 1
-            ? `
-                <button
-                    class="delete-btn"
-                    data-id="${post.id}"
-                    type="button"
-                >
-                    삭제
-                </button>
-            `
-            : "";
 
 
     return `
@@ -323,7 +385,9 @@ function createPostHTML(post) {
                 </span>
 
                 <span class="post-date">
-                    ${formatDate(post.created_at)}
+                    ${formatDate(
+                        post.created_at
+                    )}
                 </span>
 
             </div>
@@ -334,28 +398,30 @@ function createPostHTML(post) {
             </h2>
 
 
-            <div class="post-content">
-                ${formatPostContent(post.content)}
-            </div>
+            <p class="post-content">
+                ${escapeHtml(post.content)}
+            </p>
 
 
             ${
                 tags.length
-                    ? `
-                        <div class="post-tags">
+                ? `
+                    <div class="post-tags">
 
-                            ${
-                                tags
-                                    .map(
-                                        tag =>
-                                            `<span>#${escapeHtml(tag)}</span>`
-                                    )
-                                    .join("")
-                            }
+                        ${
+                            tags
+                                .map(
+                                    tag =>
+                                    `<span>
+                                        #${escapeHtml(tag)}
+                                    </span>`
+                                )
+                                .join("")
+                        }
 
-                        </div>
-                    `
-                    : ""
+                    </div>
+                `
+                : ""
             }
 
 
@@ -368,8 +434,6 @@ function createPostHTML(post) {
                 >
                     ♥ ${post.likes || 0}
                 </button>
-
-                ${deleteButton}
 
             </div>
 
@@ -384,97 +448,44 @@ function createPostHTML(post) {
 
 function attachPostEvents() {
 
-
-    // 좋아요
     document
         .querySelectorAll(".like-btn")
-        .forEach(button => {
+        .forEach(
+            button => {
 
-            button.addEventListener(
-                "click",
-                async () => {
+                button.addEventListener(
+                    "click",
+                    async () => {
 
-                    try {
+                        try {
 
-                        const id =
-                            button.dataset.id;
+                            const id =
+                                button.dataset.id;
 
-                        const result =
-                            await apiFetch(
-                                `/api/posts/${id}/like`,
-                                {
-                                    method: "POST"
-                                }
+
+                            const result =
+                                await apiFetch(
+                                    `/api/posts/${id}/like`,
+                                    {
+                                        method: "POST"
+                                    }
+                                );
+
+
+                            button.textContent =
+                                `♥ ${result.likes}`;
+
+
+                        } catch (error) {
+
+                            alert(
+                                error.message
                             );
-
-                        button.textContent =
-                            `♥ ${result.likes}`;
-
-                    } catch (error) {
-
-                        alert(
-                            error.message
-                        );
+                        }
                     }
-                }
-            );
-
-        });
-
-
-    // 관리자 삭제
-    document
-        .querySelectorAll(".delete-btn")
-        .forEach(button => {
-
-            button.addEventListener(
-                "click",
-                async () => {
-
-                    const id =
-                        button.dataset.id;
-
-
-                    const confirmed =
-                        confirm(
-                            "정말 이 게시글을 삭제하시겠습니까?"
-                        );
-
-
-                    if (!confirmed) {
-                        return;
-                    }
-
-
-                    try {
-
-                        await apiFetch(
-                            `/api/posts/${id}`,
-                            {
-                                method: "DELETE"
-                            }
-                        );
-
-
-                        alert(
-                            "게시글이 삭제되었습니다."
-                        );
-
-
-                        await loadPosts();
-
-                    } catch (error) {
-
-                        alert(
-                            `삭제 실패: ${error.message}`
-                        );
-                    }
-
-                }
-            );
-
-        });
-
+                );
+            }
+        );
 }
 
 
@@ -514,28 +525,15 @@ async function createPost(
 
     closeModal();
 
-    await loadPosts();
+
+    await loadPosts(
+        "latest"
+    );
+
 
     alert(
         "게시물이 등록되었습니다!"
     );
-}
-
-
-// =========================
-// Delete Post
-// =========================
-
-async function deletePost(postId) {
-
-    await apiFetch(
-        `/api/posts/${postId}`,
-        {
-            method: "DELETE"
-        }
-    );
-
-    await loadPosts();
 }
 
 
@@ -546,13 +544,17 @@ async function deletePost(postId) {
 function openModal(content) {
 
     let modal =
-        document.getElementById("modal");
+        document.getElementById(
+            "modal"
+        );
 
 
     if (!modal) {
 
         modal =
-            document.createElement("div");
+            document.createElement(
+                "div"
+            );
 
         modal.id = "modal";
 
@@ -566,7 +568,9 @@ function openModal(content) {
 
     modal.innerHTML = content;
 
-    modal.classList.add("active");
+    modal.classList.add(
+        "active"
+    );
 
 
     modal
@@ -584,6 +588,7 @@ function openModal(content) {
             if (
                 event.target === modal
             ) {
+
                 closeModal();
             }
 
@@ -598,7 +603,9 @@ function openModal(content) {
 function closeModal() {
 
     const modal =
-        document.getElementById("modal");
+        document.getElementById(
+            "modal"
+        );
 
 
     if (modal) {
@@ -723,7 +730,6 @@ function openLoginModal() {
                         .textContent =
                         error.message;
                 }
-
             }
         );
 
@@ -810,7 +816,9 @@ function showRegisterForm() {
 
 
     document
-        .getElementById("registerForm")
+        .getElementById(
+            "registerForm"
+        )
         ?.addEventListener(
             "submit",
             async event => {
@@ -850,7 +858,6 @@ function showRegisterForm() {
                         .textContent =
                         error.message;
                 }
-
             }
         );
 
@@ -940,7 +947,9 @@ function openWriteModal() {
 
 
     document
-        .getElementById("postForm")
+        .getElementById(
+            "postForm"
+        )
         ?.addEventListener(
             "submit",
             async event => {
@@ -986,45 +995,8 @@ function openWriteModal() {
                         error.message
                     );
                 }
-
             }
         );
-}
-
-
-// =========================
-// YouTube Preview
-// =========================
-
-function formatPostContent(content) {
-
-    const escaped =
-        escapeHtml(content);
-
-
-    const youtubeRegex =
-        /https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/g;
-
-
-    return escaped.replace(
-        youtubeRegex,
-        (match, videoId) => {
-
-            return `
-                <div class="youtube-preview">
-
-                    <iframe
-                        src="https://www.youtube.com/embed/${videoId}"
-                        title="YouTube video"
-                        frameborder="0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                        allowfullscreen
-                    ></iframe>
-
-                </div>
-            `;
-        }
-    );
 }
 
 
@@ -1032,9 +1004,12 @@ function formatPostContent(content) {
 // Helpers
 // =========================
 
-function formatDate(dateString) {
+function formatDate(
+    dateString
+) {
 
     if (!dateString) return "";
+
 
     const date =
         new Date(dateString);
@@ -1053,9 +1028,13 @@ function formatDate(dateString) {
 }
 
 
-function escapeHtml(value) {
+function escapeHtml(
+    value
+) {
 
-    return String(value ?? "")
+    return String(
+        value ?? ""
+    )
         .replaceAll(
             "&",
             "&amp;"
@@ -1089,11 +1068,140 @@ document.addEventListener(
 
         await loadUser();
 
-        await loadPosts();
+        await loadPosts(
+            "latest"
+        );
 
+
+        // =========================
+        // 최신 / 인기 탭
+        // =========================
+
+        const tabs =
+            document.querySelectorAll(
+                ".tabs button"
+            );
+
+
+        tabs.forEach(
+            (button, index) => {
+
+                button.addEventListener(
+                    "click",
+                    async () => {
+
+                        tabs.forEach(
+                            btn => {
+
+                                btn.classList.remove(
+                                    "selected"
+                                );
+
+                            }
+                        );
+
+
+                        button.classList.add(
+                            "selected"
+                        );
+
+
+                        if (index === 0) {
+
+                            await loadPosts(
+                                "latest"
+                            );
+
+                        } else {
+
+                            await loadPosts(
+                                "popular"
+                            );
+                        }
+
+                    }
+                );
+
+            }
+        );
+
+
+        // =========================
+        // 정렬 Select
+        // =========================
+
+        const sortSelect =
+            document.querySelector(
+                ".feed-header select"
+            );
+
+
+        sortSelect?.addEventListener(
+            "change",
+            async () => {
+
+                if (
+                    sortSelect.value ===
+                    "인기순"
+                ) {
+
+                    await loadPosts(
+                        "popular"
+                    );
+
+
+                    tabs.forEach(
+                        btn => {
+
+                            btn.classList.remove(
+                                "selected"
+                            );
+
+                        }
+                    );
+
+
+                    tabs[1]
+                        ?.classList.add(
+                            "selected"
+                        );
+
+                } else {
+
+                    await loadPosts(
+                        "latest"
+                    );
+
+
+                    tabs.forEach(
+                        btn => {
+
+                            btn.classList.remove(
+                                "selected"
+                            );
+
+                        }
+                    );
+
+
+                    tabs[0]
+                        ?.classList.add(
+                            "selected"
+                        );
+                }
+
+            }
+        );
+
+
+        // =========================
+        // 글쓰기
+        // =========================
 
         document
-            .querySelector(".write-btn")
+            .querySelector(
+                ".write-btn"
+            )
             ?.addEventListener(
                 "click",
                 openWriteModal
