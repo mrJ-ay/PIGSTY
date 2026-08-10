@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from pydantic import BaseModel
+
 from sqlalchemy import (
     create_engine,
     Column,
@@ -12,10 +13,14 @@ from sqlalchemy import (
     String,
     Text,
     DateTime,
+    inspect,
+    text,
 )
+
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
 from passlib.context import CryptContext
+
 import jwt
 
 
@@ -55,7 +60,6 @@ def get_db():
 
     try:
         yield db
-
     finally:
         db.close()
 
@@ -87,6 +91,12 @@ class User(Base):
     )
 
     is_admin = Column(
+        Integer,
+        default=0,
+        nullable=False
+    )
+
+    is_banned = Column(
         Integer,
         default=0,
         nullable=False
@@ -134,9 +144,47 @@ class Post(Base):
     )
 
 
+# =========================================================
+# Database 생성
+# =========================================================
+
 Base.metadata.create_all(
     bind=engine
 )
+
+
+# =========================================================
+# 기존 DB 마이그레이션
+# =========================================================
+
+def migrate_database():
+
+    inspector = inspect(engine)
+
+    tables = inspector.get_table_names()
+
+    if "users" not in tables:
+        return
+
+    columns = [
+        column["name"]
+        for column in inspector.get_columns("users")
+    ]
+
+    if "is_banned" not in columns:
+
+        with engine.begin() as connection:
+
+            connection.execute(
+                text(
+                    "ALTER TABLE users "
+                    "ADD COLUMN is_banned INTEGER "
+                    "NOT NULL DEFAULT 0"
+                )
+            )
+
+
+migrate_database()
 
 
 # =========================================================
@@ -181,7 +229,9 @@ pwd_context = CryptContext(
 
 def hash_password(password: str):
 
-    return pwd_context.hash(password)
+    return pwd_context.hash(
+        password
+    )
 
 
 def verify_password(
@@ -266,9 +316,11 @@ def get_current_user(
             detail="Invalid token"
         )
 
+
     user = db.query(User).filter(
         User.username == username
     ).first()
+
 
     if not user:
 
@@ -277,7 +329,36 @@ def get_current_user(
             detail="User not found"
         )
 
+
+    # 밴된 사용자는 즉시 접근 차단
+    if user.is_banned == 1:
+
+        raise HTTPException(
+            status_code=403,
+            detail="밴된 계정입니다."
+        )
+
+
     return user
+
+
+# =========================================================
+# Admin 확인
+# =========================================================
+
+def get_admin_user(
+    current_user: User =
+        Depends(get_current_user)
+):
+
+    if current_user.is_admin != 1:
+
+        raise HTTPException(
+            status_code=403,
+            detail="관리자만 사용할 수 있습니다."
+        )
+
+    return current_user
 
 
 # =========================================================
@@ -287,23 +368,19 @@ def get_current_user(
 class RegisterRequest(BaseModel):
 
     username: str
-
     password: str
 
 
 class LoginRequest(BaseModel):
 
     username: str
-
     password: str
 
 
 class PostCreate(BaseModel):
 
     title: str
-
     content: str
-
     tags: str = ""
 
 
@@ -337,12 +414,14 @@ def register(
 
     password = request.password
 
+
     if len(username) < 2:
 
         raise HTTPException(
             status_code=400,
             detail="사용자 이름은 2자 이상이어야 합니다."
         )
+
 
     if len(password) < 4:
 
@@ -351,9 +430,11 @@ def register(
             detail="비밀번호는 4자 이상이어야 합니다."
         )
 
+
     existing = db.query(User).filter(
         User.username == username
     ).first()
+
 
     if existing:
 
@@ -362,19 +443,23 @@ def register(
             detail="이미 존재하는 사용자 이름입니다."
         )
 
+
     user = User(
         username=username,
         password_hash=hash_password(
             password
         ),
-        is_admin=0
+        is_admin=0,
+        is_banned=0
     )
+
 
     db.add(user)
 
     db.commit()
 
     db.refresh(user)
+
 
     return {
         "message": "회원가입 성공",
@@ -400,12 +485,14 @@ def login(
         User.username == request.username
     ).first()
 
+
     if not user:
 
         raise HTTPException(
             status_code=401,
             detail="아이디 또는 비밀번호가 올바르지 않습니다."
         )
+
 
     if not verify_password(
         request.password,
@@ -417,9 +504,20 @@ def login(
             detail="아이디 또는 비밀번호가 올바르지 않습니다."
         )
 
+
+    # 밴 여부 확인
+    if user.is_banned == 1:
+
+        raise HTTPException(
+            status_code=403,
+            detail="밴된 계정입니다."
+        )
+
+
     token = create_access_token(
         user.username
     )
+
 
     return {
         "access_token": token,
@@ -442,7 +540,8 @@ def me(
     return {
         "id": current_user.id,
         "username": current_user.username,
-        "is_admin": current_user.is_admin
+        "is_admin": current_user.is_admin,
+        "is_banned": current_user.is_banned
     }
 
 
@@ -464,6 +563,7 @@ def make_admin(
         User.username == username
     ).first()
 
+
     if not user:
 
         raise HTTPException(
@@ -471,16 +571,115 @@ def make_admin(
             detail="사용자를 찾을 수 없습니다."
         )
 
+
     user.is_admin = 1
 
     db.commit()
 
     db.refresh(user)
 
+
     return {
         "message": "관리자로 지정되었습니다.",
         "username": user.username,
         "is_admin": user.is_admin
+    }
+
+
+# =========================================================
+# Admin - Ban
+# =========================================================
+
+@app.post(
+    "/api/admin/ban/{username}"
+)
+def ban_user(
+    username: str,
+
+    current_admin: User =
+        Depends(get_admin_user),
+
+    db: Session =
+        Depends(get_db)
+):
+
+    user = db.query(User).filter(
+        User.username == username
+    ).first()
+
+
+    if not user:
+
+        raise HTTPException(
+            status_code=404,
+            detail="사용자를 찾을 수 없습니다."
+        )
+
+
+    # 자기 자신 밴 방지
+    if user.id == current_admin.id:
+
+        raise HTTPException(
+            status_code=400,
+            detail="자기 자신은 밴할 수 없습니다."
+        )
+
+
+    user.is_banned = 1
+
+    db.commit()
+
+    db.refresh(user)
+
+
+    return {
+        "message": "사용자를 밴했습니다.",
+        "username": user.username,
+        "is_banned": user.is_banned
+    }
+
+
+# =========================================================
+# Admin - Unban
+# =========================================================
+
+@app.post(
+    "/api/admin/unban/{username}"
+)
+def unban_user(
+    username: str,
+
+    current_admin: User =
+        Depends(get_admin_user),
+
+    db: Session =
+        Depends(get_db)
+):
+
+    user = db.query(User).filter(
+        User.username == username
+    ).first()
+
+
+    if not user:
+
+        raise HTTPException(
+            status_code=404,
+            detail="사용자를 찾을 수 없습니다."
+        )
+
+
+    user.is_banned = 0
+
+    db.commit()
+
+    db.refresh(user)
+
+
+    return {
+        "message": "밴을 해제했습니다.",
+        "username": user.username,
+        "is_banned": user.is_banned
     }
 
 
@@ -499,6 +698,7 @@ def get_posts(
     posts = db.query(Post).order_by(
         Post.created_at.desc()
     ).all()
+
 
     return [
 
@@ -543,12 +743,14 @@ def create_post(
 
     tags = request.tags.strip()
 
+
     if not title:
 
         raise HTTPException(
             status_code=400,
             detail="제목을 입력해주세요."
         )
+
 
     if not content:
 
@@ -557,18 +759,15 @@ def create_post(
             detail="내용을 입력해주세요."
         )
 
+
     post = Post(
-
         title=title,
-
         content=content,
-
         tags=tags,
-
         author=current_user.username,
-
         likes=0
     )
+
 
     db.add(post)
 
@@ -576,27 +775,21 @@ def create_post(
 
     db.refresh(post)
 
+
     return {
-
         "id": post.id,
-
         "title": post.title,
-
         "content": post.content,
-
         "tags": post.tags,
-
         "author": post.author,
-
         "likes": post.likes,
-
         "created_at":
             post.created_at.isoformat()
     }
 
 
 # =========================================================
-# Posts - Delete One
+# Posts - Delete
 # =========================================================
 
 @app.delete(
@@ -612,7 +805,6 @@ def delete_post(
         Depends(get_db)
 ):
 
-    # 관리자만 삭제 가능
     if current_user.is_admin != 1:
 
         raise HTTPException(
@@ -620,9 +812,11 @@ def delete_post(
             detail="관리자만 게시글을 삭제할 수 있습니다."
         )
 
+
     post = db.query(Post).filter(
         Post.id == post_id
     ).first()
+
 
     if not post:
 
@@ -631,47 +825,14 @@ def delete_post(
             detail="게시물을 찾을 수 없습니다."
         )
 
+
     db.delete(post)
 
     db.commit()
 
+
     return {
         "message": "게시글이 삭제되었습니다."
-    }
-
-
-# =========================================================
-# Posts - Delete All
-# =========================================================
-
-@app.delete(
-    "/api/posts"
-)
-def delete_all_posts(
-    current_user: User =
-        Depends(get_current_user),
-
-    db: Session =
-        Depends(get_db)
-):
-
-    # 관리자만 전체 삭제 가능
-    if current_user.is_admin != 1:
-
-        raise HTTPException(
-            status_code=403,
-            detail="관리자만 모든 게시글을 삭제할 수 있습니다."
-        )
-
-    deleted_count = db.query(Post).delete(
-        synchronize_session=False
-    )
-
-    db.commit()
-
-    return {
-        "message": "모든 게시글이 삭제되었습니다.",
-        "deleted_count": deleted_count
     }
 
 
@@ -693,6 +854,7 @@ def like_post(
         Post.id == post_id
     ).first()
 
+
     if not post:
 
         raise HTTPException(
@@ -700,13 +862,16 @@ def like_post(
             detail="게시물을 찾을 수 없습니다."
         )
 
+
     post.likes = (
         post.likes or 0
     ) + 1
 
+
     db.commit()
 
     db.refresh(post)
+
 
     return {
         "id": post.id,
