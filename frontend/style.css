@@ -903,3 +903,102 @@ aside {
     }
 
 }
+
+
+
+/* =========================
+   Search
+========================= */
+
+.search-box {
+    position: fixed;
+
+    top: 80px;
+    right: 30px;
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 8px;
+
+    padding: 10px;
+
+    background: white;
+
+    border: 1px solid #ddd;
+
+    border-radius: 12px;
+
+    box-shadow:
+        0 10px 30px rgba(0, 0, 0, 0.12);
+
+    z-index: 9999;
+
+    opacity: 0;
+
+    transform:
+        translateY(-10px);
+
+    pointer-events: none;
+
+    transition:
+        opacity 0.2s ease,
+        transform 0.2s ease;
+}
+
+
+.search-box.active {
+
+    opacity: 1;
+
+    transform:
+        translateY(0);
+
+    pointer-events: auto;
+}
+
+
+.search-box input {
+
+    width: 280px;
+
+    padding: 10px 12px;
+
+    border: 1px solid #ddd;
+
+    border-radius: 8px;
+
+    outline: none;
+
+    font-size: 14px;
+}
+
+
+.search-box input:focus {
+
+    border-color: #999;
+}
+
+
+.search-box button {
+
+    width: 34px;
+    height: 34px;
+
+    border: none;
+
+    background: transparent;
+
+    cursor: pointer;
+
+    font-size: 20px;
+
+    border-radius: 8px;
+}
+
+
+.search-box button:hover {
+
+    background: #f2f2f2;
+}

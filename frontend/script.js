@@ -8,6 +8,12 @@ let token =
 
 let currentUser = null;
 
+let allPosts = [];
+
+let currentSort = "latest";
+
+let searchInput = null;
+
 
 // =========================================================
 // DOM
@@ -40,6 +46,7 @@ async function apiFetch(
 
         headers["Authorization"] =
             `Bearer ${token}`;
+
     }
 
 
@@ -63,6 +70,7 @@ async function apiFetch(
     } catch {
 
         data = {};
+
     }
 
 
@@ -72,6 +80,7 @@ async function apiFetch(
             data.detail ||
             `HTTP ${response.status}`
         );
+
     }
 
 
@@ -94,6 +103,7 @@ async function loadUser() {
         updateAdminUI();
 
         return;
+
     }
 
 
@@ -113,6 +123,7 @@ async function loadUser() {
         localStorage.removeItem(
             "pigsty_token"
         );
+
     }
 
 
@@ -121,6 +132,10 @@ async function loadUser() {
     updateAdminUI();
 }
 
+
+// =========================================================
+// Auth UI
+// =========================================================
 
 function updateAuthUI() {
 
@@ -184,9 +199,14 @@ function updateAuthUI() {
                 "click",
                 openLoginModal
             );
+
     }
 }
 
+
+// =========================================================
+// Admin UI
+// =========================================================
 
 function updateAdminUI() {
 
@@ -201,7 +221,9 @@ function updateAdminUI() {
 
     if (
         currentUser &&
-        Number(currentUser.is_admin) === 1
+        Number(
+            currentUser.is_admin
+        ) === 1
     ) {
 
         button.style.display =
@@ -211,9 +233,14 @@ function updateAdminUI() {
 
         button.style.display =
             "none";
+
     }
 }
 
+
+// =========================================================
+// Logout
+// =========================================================
 
 function logout() {
 
@@ -225,13 +252,16 @@ function logout() {
         "pigsty_token"
     );
 
+
     updateAuthUI();
 
     updateAdminUI();
 
+
     loadPosts(
         "latest"
     );
+
 }
 
 
@@ -271,9 +301,7 @@ async function login(
 
     await loadUser();
 
-
     closeModal();
-
 
     await loadPosts(
         "latest"
@@ -283,6 +311,7 @@ async function login(
     alert(
         "로그인 성공!"
     );
+
 }
 
 
@@ -315,11 +344,12 @@ async function register(
 
 
     openLoginModal();
+
 }
 
 
 // =========================================================
-// Posts
+// Posts - Load
 // =========================================================
 
 async function loadPosts(
@@ -333,6 +363,9 @@ async function loadPosts(
 
 
     if (!postsContainer) return;
+
+
+    currentSort = sort;
 
 
     postsContainer.innerHTML = `
@@ -365,89 +398,17 @@ async function loadPosts(
             throw new Error(
                 "게시물 데이터가 올바르지 않습니다."
             );
+
         }
 
 
-        if (!posts.length) {
-
-            postsContainer.innerHTML = `
-
-                <div class="empty-posts">
-
-                    <h3>
-                        아직 게시물이 없습니다.
-                    </h3>
-
-                    <p>
-                        첫 번째 게시물을 올려보세요.
-                    </p>
-
-                </div>
-
-            `;
-
-            return;
-        }
+        allPosts = posts;
 
 
-        // 최신순
-
-        if (sort === "latest") {
-
-            posts.sort(
-                (a, b) =>
-                    new Date(
-                        b.created_at
-                    ) -
-                    new Date(
-                        a.created_at
-                    )
-            );
-        }
-
-
-        // 인기순
-
-        if (sort === "popular") {
-
-            posts.sort(
-                (a, b) => {
-
-                    const likeDifference =
-                        (b.likes || 0) -
-                        (a.likes || 0);
-
-
-                    if (
-                        likeDifference !== 0
-                    ) {
-
-                        return likeDifference;
-                    }
-
-
-                    return (
-                        new Date(
-                            b.created_at
-                        ) -
-                        new Date(
-                            a.created_at
-                        )
-                    );
-                }
-            );
-        }
-
-
-        postsContainer.innerHTML =
-            posts
-                .map(
-                    createPostHTML
-                )
-                .join("");
-
-
-        attachPostEvents();
+        renderPosts(
+            allPosts,
+            sort
+        );
 
 
     } catch (error) {
@@ -475,12 +436,128 @@ async function loadPosts(
             </div>
 
         `;
+
     }
+
 }
 
 
 // =========================================================
-// YouTube
+// Posts - Render
+// =========================================================
+
+function renderPosts(
+    posts,
+    sort = "latest"
+) {
+
+    const postsContainer =
+        document.getElementById(
+            "posts"
+        );
+
+
+    if (!postsContainer) return;
+
+
+    currentSort = sort;
+
+
+    const sortedPosts =
+        [...posts];
+
+
+    // 최신순
+
+    if (sort === "latest") {
+
+        sortedPosts.sort(
+            (a, b) =>
+                new Date(
+                    b.created_at
+                ) -
+                new Date(
+                    a.created_at
+                )
+        );
+
+    }
+
+
+    // 인기순
+
+    if (sort === "popular") {
+
+        sortedPosts.sort(
+            (a, b) => {
+
+                const likeDifference =
+                    (b.likes || 0) -
+                    (a.likes || 0);
+
+
+                if (
+                    likeDifference !== 0
+                ) {
+
+                    return likeDifference;
+
+                }
+
+
+                return (
+                    new Date(
+                        b.created_at
+                    ) -
+                    new Date(
+                        a.created_at
+                    )
+                );
+
+            }
+        );
+
+    }
+
+
+    if (!sortedPosts.length) {
+
+        postsContainer.innerHTML = `
+
+            <div class="empty-posts">
+
+                <h3>
+                    게시물이 없습니다.
+                </h3>
+
+                <p>
+                    다른 검색어를 입력해보세요.
+                </p>
+
+            </div>
+
+        `;
+
+        return;
+
+    }
+
+
+    postsContainer.innerHTML =
+        sortedPosts
+            .map(
+                createPostHTML
+            )
+            .join("");
+
+
+    attachPostEvents();
+
+}
+
+
+// =========================================================
+// YouTube ID
 // =========================================================
 
 function getYouTubeId(
@@ -515,13 +592,20 @@ function getYouTubeId(
         if (match) {
 
             return match[1];
+
         }
+
     }
 
 
     return null;
+
 }
 
+
+// =========================================================
+// YouTube Preview
+// =========================================================
 
 function createYouTubePreview(
     content
@@ -543,6 +627,7 @@ function createYouTubePreview(
     if (!match) {
 
         return "";
+
     }
 
 
@@ -555,6 +640,7 @@ function createYouTubePreview(
     if (!videoId) {
 
         return "";
+
     }
 
 
@@ -576,6 +662,7 @@ function createYouTubePreview(
         </div>
 
     `;
+
 }
 
 
@@ -713,6 +800,7 @@ function createPostHTML(
         </article>
 
     `;
+
 }
 
 
@@ -755,6 +843,7 @@ function attachPostEvents() {
                             button.textContent =
                                 `♥ ${result.likes}`;
 
+
                         } catch (
                             error
                         ) {
@@ -762,9 +851,12 @@ function attachPostEvents() {
                             alert(
                                 error.message
                             );
+
                         }
+
                     }
                 );
+
             }
         );
 
@@ -793,6 +885,7 @@ function attachPostEvents() {
                         ) {
 
                             return;
+
                         }
 
 
@@ -819,11 +912,15 @@ function attachPostEvents() {
                             alert(
                                 error.message
                             );
+
                         }
+
                     }
                 );
+
             }
         );
+
 }
 
 
@@ -845,6 +942,7 @@ async function deleteAllPosts() {
         );
 
         return;
+
     }
 
 
@@ -894,7 +992,9 @@ async function deleteAllPosts() {
         alert(
             error.message
         );
+
     }
+
 }
 
 
@@ -916,10 +1016,12 @@ function getCurrentSort() {
     ) {
 
         return "popular";
+
     }
 
 
-    return "latest";
+    return currentSort || "latest";
+
 }
 
 
@@ -940,6 +1042,7 @@ async function createPost(
         );
 
         return;
+
     }
 
 
@@ -969,6 +1072,7 @@ async function createPost(
     alert(
         "게시물이 등록되었습니다!"
     );
+
 }
 
 
@@ -993,15 +1097,19 @@ function openModal(
                 "div"
             );
 
+
         modal.id =
             "modal";
+
 
         modal.className =
             "modal";
 
+
         document.body.appendChild(
             modal
         );
+
     }
 
 
@@ -1034,6 +1142,7 @@ function openModal(
             ) {
 
                 closeModal();
+
             }
 
         },
@@ -1041,8 +1150,13 @@ function openModal(
             once: true
         }
     );
+
 }
 
+
+// =========================================================
+// Close Modal
+// =========================================================
 
 function closeModal() {
 
@@ -1058,9 +1172,12 @@ function closeModal() {
             "active"
         );
 
+
         modal.innerHTML =
             "";
+
     }
+
 }
 
 
@@ -1178,7 +1295,9 @@ function openLoginModal() {
                         )
                         .textContent =
                         error.message;
+
                 }
+
             }
         );
 
@@ -1191,6 +1310,7 @@ function openLoginModal() {
             "click",
             showRegisterForm
         );
+
 }
 
 
@@ -1308,7 +1428,9 @@ function showRegisterForm() {
                         )
                         .textContent =
                         error.message;
+
                 }
+
             }
         );
 
@@ -1321,6 +1443,7 @@ function showRegisterForm() {
             "click",
             openLoginModal
         );
+
 }
 
 
@@ -1336,9 +1459,11 @@ function openWriteModal() {
             "로그인이 필요합니다."
         );
 
+
         openLoginModal();
 
         return;
+
     }
 
 
@@ -1447,9 +1572,12 @@ function openWriteModal() {
                     alert(
                         error.message
                     );
+
                 }
+
             }
         );
+
 }
 
 
@@ -1480,6 +1608,7 @@ function formatDate(
             minute: "2-digit"
         }
     );
+
 }
 
 
@@ -1510,6 +1639,227 @@ function escapeHtml(
             "'",
             "&#039;"
         );
+
+}
+
+
+// =========================================================
+// Search
+// =========================================================
+
+function openSearch() {
+
+    let searchBox =
+        document.getElementById(
+            "searchBox"
+        );
+
+
+    if (searchBox) {
+
+        searchBox.classList.toggle(
+            "active"
+        );
+
+
+        if (
+            searchBox.classList.contains(
+                "active"
+            )
+        ) {
+
+            searchInput?.focus();
+
+        }
+
+
+        return;
+
+    }
+
+
+    searchBox =
+        document.createElement(
+            "div"
+        );
+
+
+    searchBox.id =
+        "searchBox";
+
+
+    searchBox.className =
+        "search-box";
+
+
+    searchBox.innerHTML = `
+
+        <input
+            id="searchInput"
+            type="search"
+            placeholder="게시물 검색..."
+            autocomplete="off"
+        >
+
+
+        <button
+            id="searchClose"
+            type="button"
+        >
+            ×
+        </button>
+
+    `;
+
+
+    document.body.appendChild(
+        searchBox
+    );
+
+
+    searchInput =
+        document.getElementById(
+            "searchInput"
+        );
+
+
+    searchInput.addEventListener(
+        "input",
+        () => {
+
+            filterPosts(
+                searchInput.value
+            );
+
+        }
+    );
+
+
+    document
+        .getElementById(
+            "searchClose"
+        )
+        ?.addEventListener(
+            "click",
+            closeSearch
+        );
+
+
+    searchBox.classList.add(
+        "active"
+    );
+
+
+    searchInput.focus();
+
+}
+
+
+// =========================================================
+// Close Search
+// =========================================================
+
+function closeSearch() {
+
+    const searchBox =
+        document.getElementById(
+            "searchBox"
+        );
+
+
+    if (!searchBox) return;
+
+
+    searchBox.classList.remove(
+        "active"
+    );
+
+
+    if (searchInput) {
+
+        searchInput.value = "";
+
+    }
+
+
+    renderPosts(
+        allPosts,
+        currentSort
+    );
+
+}
+
+
+// =========================================================
+// Filter Posts
+// =========================================================
+
+function filterPosts(
+    keyword
+) {
+
+    const query =
+        keyword
+            .trim()
+            .toLowerCase();
+
+
+    if (!query) {
+
+        renderPosts(
+            allPosts,
+            currentSort
+        );
+
+        return;
+
+    }
+
+
+    const filtered =
+        allPosts.filter(
+            post => {
+
+                const title =
+                    String(
+                        post.title || ""
+                    ).toLowerCase();
+
+
+                const content =
+                    String(
+                        post.content || ""
+                    ).toLowerCase();
+
+
+                const author =
+                    String(
+                        post.author || ""
+                    ).toLowerCase();
+
+
+                const tags =
+                    String(
+                        post.tags || ""
+                    ).toLowerCase();
+
+
+                return (
+                    title.includes(query) ||
+                    content.includes(query) ||
+                    author.includes(query) ||
+                    tags.includes(query)
+                );
+
+            }
+        );
+
+
+    renderPosts(
+        filtered,
+        currentSort
+    );
+
 }
 
 
@@ -1522,6 +1872,7 @@ document.addEventListener(
     async () => {
 
         await loadUser();
+
 
         await loadPosts(
             "latest"
@@ -1551,6 +1902,7 @@ document.addEventListener(
                                 btn.classList.remove(
                                     "selected"
                                 );
+
                             }
                         );
 
@@ -1571,6 +1923,7 @@ document.addEventListener(
                             await loadPosts(
                                 "popular"
                             );
+
                         }
 
 
@@ -1586,9 +1939,12 @@ document.addEventListener(
                                 index === 0
                                     ? "latest"
                                     : "popular";
+
                         }
+
                     }
                 );
+
             }
         );
 
@@ -1622,6 +1978,7 @@ document.addEventListener(
                         btn.classList.remove(
                             "selected"
                         );
+
                     }
                 );
 
@@ -1641,7 +1998,9 @@ document.addEventListener(
                         ?.classList.add(
                             "selected"
                         );
+
                 }
+
             }
         );
 
@@ -1674,6 +2033,21 @@ document.addEventListener(
             );
 
 
+        // =====================================================
+        // 검색
+        // =====================================================
+
+        document
+            .querySelector(
+                ".search-btn"
+            )
+            ?.addEventListener(
+                "click",
+                openSearch
+            );
+
+
         updateAdminUI();
+
     }
 );
