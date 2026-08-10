@@ -4,6 +4,12 @@ let token = localStorage.getItem("pigsty_token");
 let currentUser = null;
 
 // =========================================================
+// DOM
+// =========================================================
+
+const authArea = document.getElementById("authArea");
+
+// =========================================================
 // API
 // =========================================================
 
@@ -74,13 +80,7 @@ async function loadUser() {
     updateAuthUI();
 }
 
-
 function updateAuthUI() {
-
-    const authArea =
-        document.getElementById(
-            "authArea"
-        );
 
     if (!authArea) return;
 
@@ -131,7 +131,6 @@ function updateAuthUI() {
             );
     }
 }
-
 
 function logout() {
 
@@ -219,11 +218,21 @@ async function loadPosts(
 ) {
 
     const postsContainer =
-        document.getElementById(
-            "posts"
-        );
+        document.getElementById("posts");
 
     if (!postsContainer) return;
+
+    postsContainer.innerHTML = `
+        <div class="empty-posts">
+            <h3>
+                게시물을 불러오는 중...
+            </h3>
+
+            <p>
+                잠시만 기다려주세요.
+            </p>
+        </div>
+    `;
 
     try {
 
@@ -231,10 +240,7 @@ async function loadPosts(
             "/api/posts"
         );
 
-        if (
-            !Array.isArray(posts) ||
-            posts.length === 0
-        ) {
+        if (!posts.length) {
 
             postsContainer.innerHTML = `
                 <div class="empty-posts">
@@ -257,14 +263,9 @@ async function loadPosts(
         if (sort === "latest") {
 
             posts.sort(
-                (a, b) => {
-
-                    return (
-                        new Date(b.created_at) -
-                        new Date(a.created_at)
-                    );
-
-                }
+                (a, b) =>
+                    new Date(b.created_at) -
+                    new Date(a.created_at)
             );
         }
 
@@ -300,7 +301,7 @@ async function loadPosts(
     } catch (error) {
 
         console.error(
-            "게시물 불러오기 오류:",
+            "게시물 로드 오류:",
             error
         );
 
@@ -321,234 +322,73 @@ async function loadPosts(
 }
 
 // =========================================================
-// YouTube URL
+// YouTube Preview
 // =========================================================
 
 function getYouTubeId(url) {
 
-    try {
+    if (!url) return null;
 
-        const parsed =
-            new URL(url);
+    const patterns = [
 
-        // youtube.com/watch?v=
-        if (
-            parsed.hostname.includes(
-                "youtube.com"
-            )
-        ) {
+        /(?:youtube\.com\/watch\?v=)([^&\s]+)/i,
 
-            const id =
-                parsed.searchParams.get(
-                    "v"
-                );
+        /(?:youtu\.be\/)([^?\s]+)/i,
 
-            if (id) {
-                return id;
-            }
+        /(?:youtube\.com\/shorts\/)([^?\s]+)/i,
+
+        /(?:youtube\.com\/embed\/)([^?\s]+)/i
+
+    ];
+
+    for (const pattern of patterns) {
+
+        const match = url.match(pattern);
+
+        if (match) {
+            return match[1];
         }
-
-        // youtu.be/ID
-        if (
-            parsed.hostname ===
-            "youtu.be"
-        ) {
-
-            return parsed.pathname
-                .slice(1)
-                .split("/")[0];
-        }
-
-        // youtube.com/shorts/ID
-        if (
-            parsed.hostname.includes(
-                "youtube.com"
-            ) &&
-            parsed.pathname.startsWith(
-                "/shorts/"
-            )
-        ) {
-
-            return parsed.pathname
-                .split("/")[2];
-        }
-
-        // youtube.com/embed/ID
-        if (
-            parsed.hostname.includes(
-                "youtube.com"
-            ) &&
-            parsed.pathname.startsWith(
-                "/embed/"
-            )
-        ) {
-
-            return parsed.pathname
-                .split("/")[2];
-        }
-
-    } catch {
-        return null;
     }
 
     return null;
 }
 
-// =========================================================
-// Link Preview
-// =========================================================
+function createYouTubePreview(content) {
 
-function createLinkPreview(url) {
+    if (!content) return "";
 
-    const youtubeId =
-        getYouTubeId(url);
+    const youtubeRegex =
+        /https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=[^\s]+|youtu\.be\/[^\s]+|youtube\.com\/shorts\/[^\s]+)/i;
 
-    // =====================================================
-    // YouTube
-    // =====================================================
+    const match =
+        content.match(youtubeRegex);
 
-    if (youtubeId) {
-
-        const safeId =
-            escapeHtml(youtubeId);
-
-        return `
-            <div class="link-preview youtube-preview">
-
-                <div class="youtube-wrapper">
-
-                    <iframe
-                        src="https://www.youtube.com/embed/${safeId}"
-                        title="YouTube video"
-                        frameborder="0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                        allowfullscreen
-                    ></iframe>
-
-                </div>
-
-                <a
-                    class="preview-link"
-                    href="${escapeHtml(url)}"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >
-                    YouTube에서 보기
-                </a>
-
-            </div>
-        `;
+    if (!match) {
+        return "";
     }
 
-    // =====================================================
-    // 일반 링크
-    // =====================================================
+    const url = match[0];
+
+    const videoId =
+        getYouTubeId(url);
+
+    if (!videoId) {
+        return "";
+    }
 
     return `
-        <div class="link-preview">
+        <div class="youtube-preview">
 
-            <a
-                href="${escapeHtml(url)}"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="preview-link"
-            >
-                🔗 ${escapeHtml(url)}
-            </a>
+            <iframe
+                src="https://www.youtube.com/embed/${encodeURIComponent(videoId)}"
+                title="YouTube video"
+                frameborder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowfullscreen
+                loading="lazy"
+            ></iframe>
 
         </div>
-    `;
-}
-
-// =========================================================
-// Content Preview
-// =========================================================
-
-function createContentHTML(content) {
-
-    const escaped =
-        escapeHtml(content);
-
-    const urlRegex =
-        /(https?:\/\/[^\s<]+)/g;
-
-    let html = escaped.replace(
-        urlRegex,
-        match => {
-
-            // 끝에 붙은 문장부호 제거
-            let url = match;
-
-            let ending = "";
-
-            while (
-                /[.,!?;:)\]}]$/.test(url)
-            ) {
-
-                ending =
-                    url.slice(-1) +
-                    ending;
-
-                url =
-                    url.slice(0, -1);
-            }
-
-            return `
-                <a
-                    href="${escapeHtml(url)}"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="content-link"
-                >
-                    ${escapeHtml(url)}
-                </a>${ending}
-            `;
-        }
-    );
-
-    const urls = content.match(
-        /https?:\/\/[^\s<]+/g
-    ) || [];
-
-    const previews = [];
-
-    const seen = new Set();
-
-    urls.forEach(rawUrl => {
-
-        let url = rawUrl;
-
-        while (
-            /[.,!?;:)\]}]$/.test(url)
-        ) {
-            url = url.slice(0, -1);
-        }
-
-        if (seen.has(url)) {
-            return;
-        }
-
-        seen.add(url);
-
-        previews.push(
-            createLinkPreview(url)
-        );
-    });
-
-    return `
-        <div class="post-text">
-            ${html}
-        </div>
-
-        ${
-            previews.length
-            ? `
-                <div class="post-previews">
-                    ${previews.join("")}
-                </div>
-            `
-            : ""
-        }
     `;
 }
 
@@ -561,16 +401,18 @@ function createPostHTML(post) {
     const tags = post.tags
         ? post.tags
             .split(",")
-            .map(
-                tag => tag.trim()
-            )
+            .map(tag => tag.trim())
             .filter(Boolean)
         : [];
 
-    // 관리자 삭제 버튼
+    const youtubePreview =
+        createYouTubePreview(
+            post.content
+        );
+
     const adminButtons =
         currentUser &&
-        Number(currentUser.is_admin) === 1
+        currentUser.is_admin === 1
         ? `
             <button
                 class="delete-btn"
@@ -595,9 +437,7 @@ function createPostHTML(post) {
                 </span>
 
                 <span class="post-date">
-                    ${formatDate(
-                        post.created_at
-                    )}
+                    ${formatDate(post.created_at)}
                 </span>
 
             </div>
@@ -608,11 +448,12 @@ function createPostHTML(post) {
             </h2>
 
 
-            <div class="post-content">
-                ${createContentHTML(
-                    post.content
-                )}
-            </div>
+            <p class="post-content">
+                ${escapeHtml(post.content)}
+            </p>
+
+
+            ${youtubePreview}
 
 
             ${
@@ -661,10 +502,7 @@ function createPostHTML(post) {
 
 function attachPostEvents() {
 
-    // =====================================================
     // 좋아요
-    // =====================================================
-
     document
         .querySelectorAll(".like-btn")
         .forEach(button => {
@@ -700,10 +538,7 @@ function attachPostEvents() {
         });
 
 
-    // =====================================================
     // 관리자 게시글 삭제
-    // =====================================================
-
     document
         .querySelectorAll(".delete-btn")
         .forEach(button => {
@@ -791,22 +626,79 @@ async function createPost(
 }
 
 // =========================================================
+// Admin - Delete All Posts
+// =========================================================
+
+async function deleteAllPosts() {
+
+    if (
+        !currentUser ||
+        currentUser.is_admin !== 1
+    ) {
+
+        alert(
+            "관리자만 사용할 수 있습니다."
+        );
+
+        return;
+    }
+
+    const confirmed =
+        confirm(
+            "정말 모든 게시물을 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다."
+        );
+
+    if (!confirmed) {
+        return;
+    }
+
+    const secondConfirm =
+        confirm(
+            "⚠️ 모든 게시물이 영구적으로 삭제됩니다.\n\n계속하시겠습니까?"
+        );
+
+    if (!secondConfirm) {
+        return;
+    }
+
+    try {
+
+        await apiFetch(
+            "/api/admin/posts",
+            {
+                method: "DELETE"
+            }
+        );
+
+        alert(
+            "모든 게시물이 삭제되었습니다."
+        );
+
+        await loadPosts(
+            "latest"
+        );
+
+    } catch (error) {
+
+        alert(
+            error.message
+        );
+    }
+}
+
+// =========================================================
 // Modal
 // =========================================================
 
 function openModal(content) {
 
     let modal =
-        document.getElementById(
-            "modal"
-        );
+        document.getElementById("modal");
 
     if (!modal) {
 
         modal =
-            document.createElement(
-                "div"
-            );
+            document.createElement("div");
 
         modal.id = "modal";
         modal.className = "modal";
@@ -836,6 +728,7 @@ function openModal(content) {
             if (
                 event.target === modal
             ) {
+
                 closeModal();
             }
 
@@ -846,13 +739,10 @@ function openModal(content) {
     );
 }
 
-
 function closeModal() {
 
     const modal =
-        document.getElementById(
-            "modal"
-        );
+        document.getElementById("modal");
 
     if (modal) {
 
@@ -933,7 +823,6 @@ function openLoginModal() {
 
     `);
 
-
     document
         .getElementById("loginForm")
         ?.addEventListener(
@@ -974,7 +863,6 @@ function openLoginModal() {
                 }
             }
         );
-
 
     document
         .getElementById(
@@ -1055,11 +943,8 @@ function showRegisterForm() {
 
     `);
 
-
     document
-        .getElementById(
-            "registerForm"
-        )
+        .getElementById("registerForm")
         ?.addEventListener(
             "submit",
             async event => {
@@ -1098,7 +983,6 @@ function showRegisterForm() {
                 }
             }
         );
-
 
     document
         .getElementById(
@@ -1156,7 +1040,7 @@ function openWriteModal() {
 
                 <textarea
                     id="postContent"
-                    placeholder="내용을 작성하세요.&#10;&#10;YouTube 링크를 넣으면 미리보기가 표시됩니다."
+                    placeholder="내용을 작성하세요.&#10;&#10;YouTube 링크를 넣으면 자동으로 미리보기가 표시됩니다."
                     required
                 ></textarea>
 
@@ -1181,11 +1065,8 @@ function openWriteModal() {
 
     `);
 
-
     document
-        .getElementById(
-            "postForm"
-        )
+        .getElementById("postForm")
         ?.addEventListener(
             "submit",
             async event => {
@@ -1244,14 +1125,6 @@ function formatDate(
     const date =
         new Date(dateString);
 
-    if (
-        Number.isNaN(
-            date.getTime()
-        )
-    ) {
-        return "";
-    }
-
     return date.toLocaleString(
         "ko-KR",
         {
@@ -1263,7 +1136,6 @@ function formatDate(
         }
     );
 }
-
 
 function escapeHtml(
     value
@@ -1302,14 +1174,11 @@ document.addEventListener(
     "DOMContentLoaded",
     async () => {
 
-        // 로그인 상태
         await loadUser();
 
-        // 게시물
         await loadPosts(
             "latest"
         );
-
 
         // =====================================================
         // 최신 / 인기
@@ -1320,7 +1189,6 @@ document.addEventListener(
                 ".tabs button"
             );
 
-
         tabs.forEach(
             (button, index) => {
 
@@ -1330,11 +1198,9 @@ document.addEventListener(
 
                         tabs.forEach(
                             btn => {
-
                                 btn.classList.remove(
                                     "selected"
                                 );
-
                             }
                         );
 
@@ -1359,16 +1225,14 @@ document.addEventListener(
             }
         );
 
-
         // =====================================================
-        // 정렬 Select
+        // Select
         // =====================================================
 
         const sortSelect =
             document.querySelector(
                 ".feed-header select"
             );
-
 
         sortSelect?.addEventListener(
             "change",
@@ -1385,11 +1249,9 @@ document.addEventListener(
 
                     tabs.forEach(
                         btn => {
-
                             btn.classList.remove(
                                 "selected"
                             );
-
                         }
                     );
 
@@ -1406,11 +1268,9 @@ document.addEventListener(
 
                     tabs.forEach(
                         btn => {
-
                             btn.classList.remove(
                                 "selected"
                             );
-
                         }
                     );
 
@@ -1421,7 +1281,6 @@ document.addEventListener(
                 }
             }
         );
-
 
         // =====================================================
         // 글쓰기
@@ -1436,5 +1295,55 @@ document.addEventListener(
                 openWriteModal
             );
 
+        // =====================================================
+        // 관리자 전체 삭제
+        // =====================================================
+
+        if (
+            currentUser &&
+            currentUser.is_admin === 1
+        ) {
+
+            const feedHeader =
+                document.querySelector(
+                    ".feed-header"
+                );
+
+            if (feedHeader) {
+
+                const existing =
+                    document.getElementById(
+                        "deleteAllPostsBtn"
+                    );
+
+                if (!existing) {
+
+                    const button =
+                        document.createElement(
+                            "button"
+                        );
+
+                    button.id =
+                        "deleteAllPostsBtn";
+
+                    button.className =
+                        "delete-all-btn";
+
+                    button.type = "button";
+
+                    button.textContent =
+                        "전체 게시물 삭제";
+
+                    button.addEventListener(
+                        "click",
+                        deleteAllPosts
+                    );
+
+                    feedHeader.appendChild(
+                        button
+                    );
+                }
+            }
+        }
     }
 );

@@ -699,3 +699,31 @@ def like_post(
         "id": post.id,
         "likes": post.likes
     }
+
+
+# =========================================================
+# Admin - Delete All Posts
+# =========================================================
+
+@app.delete(
+    "/api/admin/posts"
+)
+def delete_all_posts(
+    current_admin: User =
+        Depends(get_admin_user),
+
+    db: Session =
+        Depends(get_db)
+):
+
+    posts = db.query(Post).all()
+
+    for post in posts:
+        db.delete(post)
+
+    db.commit()
+
+    return {
+        "message": "모든 게시물이 삭제되었습니다.",
+        "deleted_count": len(posts)
+    }
