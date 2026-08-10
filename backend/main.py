@@ -1,6 +1,8 @@
-from datetime import datetime, timedelta, timezone
 
-from fastapi import FastAPI, Depends, HTTPException, status
+from datetime import datetime, timedelta, timezone
+import os
+
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
@@ -12,7 +14,6 @@ from sqlalchemy import (
     String,
     Text,
     DateTime,
-    ForeignKey,
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
@@ -24,8 +25,13 @@ import jwt
 # 설정
 # =========================================================
 
-SECRET_KEY = "pigsty-dev-secret-key-change-this"
+SECRET_KEY = os.getenv(
+    "SECRET_KEY",
+    "pigsty-dev-secret-key-change-this"
+)
+
 ALGORITHM = "HS256"
+
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
 
 DATABASE_URL = "sqlite:///./pigsty.db"
@@ -128,9 +134,7 @@ class Post(Base):
     )
 
 
-Base.metadata.create_all(
-    bind=engine
-)
+Base.metadata.create_all(bind=engine)
 
 
 # =========================================================
@@ -148,13 +152,17 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
+
     allow_origins=[
         "http://127.0.0.1:5500",
         "http://localhost:5500",
         "https://pigsty.onrender.com",
     ],
+
     allow_credentials=True,
+
     allow_methods=["*"],
+
     allow_headers=["*"],
 )
 
@@ -170,6 +178,7 @@ pwd_context = CryptContext(
 
 
 def hash_password(password: str):
+
     return pwd_context.hash(password)
 
 
@@ -177,6 +186,7 @@ def verify_password(
     password: str,
     password_hash: str
 ):
+
     return pwd_context.verify(
         password,
         password_hash
@@ -194,10 +204,11 @@ def create_access_token(
     username: str
 ):
 
-    expire = datetime.now(
-        timezone.utc
-    ) + timedelta(
-        minutes=ACCESS_TOKEN_EXPIRE_MINUTES
+    expire = (
+        datetime.now(timezone.utc)
+        + timedelta(
+            minutes=ACCESS_TOKEN_EXPIRE_MINUTES
+        )
     )
 
     payload = {
@@ -233,6 +244,7 @@ def get_current_user(
         username = payload.get("sub")
 
         if not username:
+
             raise HTTPException(
                 status_code=401,
                 detail="Invalid token"
@@ -454,19 +466,28 @@ def get_posts(
 
 
     return [
+
         {
             "id": post.id,
+
             "title": post.title,
+
             "content": post.content,
+
             "tags": post.tags or "",
+
             "author": post.author,
+
             "likes": post.likes or 0,
-            "created_at": post.created_at.isoformat()
-            if post.created_at
-            else None,
+
+            "created_at":
+                post.created_at.isoformat()
+                if post.created_at
+                else None,
         }
 
         for post in posts
+
     ]
 
 
@@ -517,6 +538,7 @@ def create_post(
         author=current_user.username,
 
         likes=0
+
     )
 
 
@@ -528,13 +550,22 @@ def create_post(
 
 
     return {
+
         "id": post.id,
+
         "title": post.title,
+
         "content": post.content,
+
         "tags": post.tags,
+
         "author": post.author,
+
         "likes": post.likes,
-        "created_at": post.created_at.isoformat()
+
+        "created_at":
+            post.created_at.isoformat()
+
     }
 
 
@@ -576,6 +607,10 @@ def like_post(
 
 
     return {
+
         "id": post.id,
+
         "likes": post.likes
+
     }
+```
