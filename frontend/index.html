@@ -19,7 +19,9 @@
 
 </head>
 
+
 <body>
+
 
 <!-- =========================
      Header
@@ -30,6 +32,7 @@
     <div class="logo">
         PIGSTY
     </div>
+
 
     <nav>
 
@@ -50,6 +53,7 @@
 
     </nav>
 
+
     <div class="header-right">
 
         <button
@@ -58,6 +62,7 @@
         >
             ⌕
         </button>
+
 
         <div id="authArea">
 
@@ -76,11 +81,15 @@
 </header>
 
 
+
 <!-- =========================
      Main
 ========================== -->
 
 <main>
+
+
+    <!-- Welcome -->
 
     <section class="welcome">
 
@@ -90,9 +99,11 @@
                 PIGSTY COMMUNITY
             </span>
 
+
             <h1>
                 자유롭게 공유하는 공간
             </h1>
+
 
             <p>
                 다양한 이야기를 공유하고
@@ -100,6 +111,7 @@
             </p>
 
         </div>
+
 
         <button
             class="write-btn"
@@ -111,13 +123,18 @@
     </section>
 
 
+
     <!-- =========================
          Content
     ========================== -->
 
     <div class="layout">
 
+
+        <!-- Feed -->
+
         <section class="feed">
+
 
             <div class="feed-header">
 
@@ -130,6 +147,7 @@
                         최신
                     </button>
 
+
                     <button
                         type="button"
                     >
@@ -138,19 +156,33 @@
 
                 </div>
 
-                <select>
 
-                    <option>
+                <select id="sortSelect">
+
+                    <option value="latest">
                         최신순
                     </option>
 
-                    <option>
+                    <option value="popular">
                         인기순
                     </option>
 
                 </select>
 
+
+                <!-- 관리자용 전체 삭제 버튼 -->
+
+                <button
+                    id="deleteAllPostsBtn"
+                    class="delete-all-btn"
+                    type="button"
+                    style="display: none;"
+                >
+                    전체 게시물 삭제
+                </button>
+
             </div>
+
 
 
             <!-- Posts -->
@@ -174,7 +206,9 @@
 
             </div>
 
+
         </section>
+
 
 
         <!-- =========================
@@ -182,6 +216,7 @@
         ========================== -->
 
         <aside>
+
 
             <div class="side-card">
 
@@ -198,11 +233,13 @@
             </div>
 
 
+
             <div class="side-card">
 
                 <h3>
                     인기 태그
                 </h3>
+
 
                 <div class="tag-list">
 
@@ -231,6 +268,7 @@
             </div>
 
 
+
             <div class="side-card warning">
 
                 <h3>
@@ -243,24 +281,31 @@
                     피해를 주는 콘텐츠는
                     게시하지 마세요.
                     도배 또한 금지됩니다.
-                    그리고 부적절한 영상또한 
+                    그리고 부적절한 영상 또한
                     금지됩니다.
                 </p>
 
             </div>
 
+
         </aside>
+
 
     </div>
 
+
 </main>
+
 
 
 <!-- =========================
      JavaScript
 ========================== -->
 
-<script src="script.js"></script>
+<script
+    src="script.js"
+></script>
+
 
 </body>
 

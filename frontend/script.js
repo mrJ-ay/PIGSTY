@@ -1,53 +1,83 @@
-const API = "https://pigsty-backend.onrender.com";
+const API =
+    "https://pigsty-backend.onrender.com";
 
-let token = localStorage.getItem("pigsty_token");
+let token =
+    localStorage.getItem(
+        "pigsty_token"
+    );
+
 let currentUser = null;
+
 
 // =========================================================
 // DOM
 // =========================================================
 
-const authArea = document.getElementById("authArea");
+const authArea =
+    document.getElementById(
+        "authArea"
+    );
+
 
 // =========================================================
 // API
 // =========================================================
 
-async function apiFetch(url, options = {}) {
+async function apiFetch(
+    url,
+    options = {}
+) {
 
     const headers = {
-        "Content-Type": "application/json",
+        "Content-Type":
+            "application/json",
+
         ...(options.headers || {})
     };
 
+
     if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
+
+        headers["Authorization"] =
+            `Bearer ${token}`;
     }
 
-    const response = await fetch(
-        API + url,
-        {
-            ...options,
-            headers
-        }
-    );
+
+    const response =
+        await fetch(
+            API + url,
+            {
+                ...options,
+                headers
+            }
+        );
+
 
     let data = {};
 
     try {
-        data = await response.json();
+
+        data =
+            await response.json();
+
     } catch {
+
         data = {};
     }
 
+
     if (!response.ok) {
+
         throw new Error(
-            data.detail || `HTTP ${response.status}`
+            data.detail ||
+            `HTTP ${response.status}`
         );
     }
 
+
     return data;
 }
+
 
 // =========================================================
 // Auth
@@ -56,20 +86,28 @@ async function apiFetch(url, options = {}) {
 async function loadUser() {
 
     if (!token) {
+
         currentUser = null;
+
         updateAuthUI();
+
+        updateAdminUI();
+
         return;
     }
 
+
     try {
 
-        currentUser = await apiFetch(
-            "/api/auth/me"
-        );
+        currentUser =
+            await apiFetch(
+                "/api/auth/me"
+            );
 
     } catch {
 
         token = null;
+
         currentUser = null;
 
         localStorage.removeItem(
@@ -77,20 +115,28 @@ async function loadUser() {
         );
     }
 
+
     updateAuthUI();
+
+    updateAdminUI();
 }
+
 
 function updateAuthUI() {
 
     if (!authArea) return;
 
+
     if (currentUser) {
 
         authArea.innerHTML = `
+
             <div class="user-menu">
 
                 <span class="username">
-                    ${escapeHtml(currentUser.username)}
+                    ${escapeHtml(
+                        currentUser.username
+                    )}
                 </span>
 
                 <button
@@ -102,10 +148,14 @@ function updateAuthUI() {
                 </button>
 
             </div>
+
         `;
 
+
         document
-            .getElementById("logoutBtn")
+            .getElementById(
+                "logoutBtn"
+            )
             ?.addEventListener(
                 "click",
                 logout
@@ -114,6 +164,7 @@ function updateAuthUI() {
     } else {
 
         authArea.innerHTML = `
+
             <button
                 class="login-btn"
                 id="loginBtn"
@@ -121,10 +172,14 @@ function updateAuthUI() {
             >
                 로그인
             </button>
+
         `;
 
+
         document
-            .getElementById("loginBtn")
+            .getElementById(
+                "loginBtn"
+            )
             ?.addEventListener(
                 "click",
                 openLoginModal
@@ -132,9 +187,38 @@ function updateAuthUI() {
     }
 }
 
+
+function updateAdminUI() {
+
+    const button =
+        document.getElementById(
+            "deleteAllPostsBtn"
+        );
+
+
+    if (!button) return;
+
+
+    if (
+        currentUser &&
+        Number(currentUser.is_admin) === 1
+    ) {
+
+        button.style.display =
+            "block";
+
+    } else {
+
+        button.style.display =
+            "none";
+    }
+}
+
+
 function logout() {
 
     token = null;
+
     currentUser = null;
 
     localStorage.removeItem(
@@ -143,8 +227,13 @@ function logout() {
 
     updateAuthUI();
 
-    loadPosts("latest");
+    updateAdminUI();
+
+    loadPosts(
+        "latest"
+    );
 }
+
 
 // =========================================================
 // Login
@@ -155,31 +244,47 @@ async function login(
     password
 ) {
 
-    const data = await apiFetch(
-        "/api/auth/login",
-        {
-            method: "POST",
+    const data =
+        await apiFetch(
+            "/api/auth/login",
+            {
+                method: "POST",
 
-            body: JSON.stringify({
-                username,
-                password
-            })
-        }
-    );
+                body:
+                    JSON.stringify({
+                        username,
+                        password
+                    })
+            }
+        );
 
-    token = data.access_token;
+
+    token =
+        data.access_token;
+
 
     localStorage.setItem(
         "pigsty_token",
         token
     );
 
+
     await loadUser();
+
 
     closeModal();
 
-    alert("로그인 성공!");
+
+    await loadPosts(
+        "latest"
+    );
+
+
+    alert(
+        "로그인 성공!"
+    );
 }
+
 
 // =========================================================
 // Register
@@ -195,19 +300,23 @@ async function register(
         {
             method: "POST",
 
-            body: JSON.stringify({
-                username,
-                password
-            })
+            body:
+                JSON.stringify({
+                    username,
+                    password
+                })
         }
     );
+
 
     alert(
         "회원가입 성공! 이제 로그인하세요."
     );
 
+
     openLoginModal();
 }
+
 
 // =========================================================
 // Posts
@@ -218,12 +327,18 @@ async function loadPosts(
 ) {
 
     const postsContainer =
-        document.getElementById("posts");
+        document.getElementById(
+            "posts"
+        );
+
 
     if (!postsContainer) return;
 
+
     postsContainer.innerHTML = `
+
         <div class="empty-posts">
+
             <h3>
                 게시물을 불러오는 중...
             </h3>
@@ -231,18 +346,32 @@ async function loadPosts(
             <p>
                 잠시만 기다려주세요.
             </p>
+
         </div>
+
     `;
+
 
     try {
 
-        const posts = await apiFetch(
-            "/api/posts"
-        );
+        const posts =
+            await apiFetch(
+                "/api/posts"
+            );
+
+
+        if (!Array.isArray(posts)) {
+
+            throw new Error(
+                "게시물 데이터가 올바르지 않습니다."
+            );
+        }
+
 
         if (!posts.length) {
 
             postsContainer.innerHTML = `
+
                 <div class="empty-posts">
 
                     <h3>
@@ -254,49 +383,72 @@ async function loadPosts(
                     </p>
 
                 </div>
+
             `;
 
             return;
         }
 
+
         // 최신순
+
         if (sort === "latest") {
 
             posts.sort(
                 (a, b) =>
-                    new Date(b.created_at) -
-                    new Date(a.created_at)
+                    new Date(
+                        b.created_at
+                    ) -
+                    new Date(
+                        a.created_at
+                    )
             );
         }
 
+
         // 인기순
+
         if (sort === "popular") {
 
             posts.sort(
                 (a, b) => {
 
-                    const likes =
+                    const likeDifference =
                         (b.likes || 0) -
                         (a.likes || 0);
 
-                    if (likes !== 0) {
-                        return likes;
+
+                    if (
+                        likeDifference !== 0
+                    ) {
+
+                        return likeDifference;
                     }
 
+
                     return (
-                        new Date(b.created_at) -
-                        new Date(a.created_at)
+                        new Date(
+                            b.created_at
+                        ) -
+                        new Date(
+                            a.created_at
+                        )
                     );
                 }
             );
         }
 
+
         postsContainer.innerHTML =
             posts
-                .map(createPostHTML)
+                .map(
+                    createPostHTML
+                )
                 .join("");
 
+
         attachPostEvents();
+
 
     } catch (error) {
 
@@ -305,7 +457,9 @@ async function loadPosts(
             error
         );
 
+
         postsContainer.innerHTML = `
+
             <div class="empty-posts">
 
                 <h3>
@@ -313,74 +467,105 @@ async function loadPosts(
                 </h3>
 
                 <p>
-                    ${escapeHtml(error.message)}
+                    ${escapeHtml(
+                        error.message
+                    )}
                 </p>
 
             </div>
+
         `;
     }
 }
 
+
 // =========================================================
-// YouTube Preview
+// YouTube
 // =========================================================
 
-function getYouTubeId(url) {
+function getYouTubeId(
+    url
+) {
 
     if (!url) return null;
 
+
     const patterns = [
 
-        /(?:youtube\.com\/watch\?v=)([^&\s]+)/i,
+        /youtube\.com\/watch\?v=([^&\s]+)/i,
 
-        /(?:youtu\.be\/)([^?\s]+)/i,
+        /youtu\.be\/([^?\s]+)/i,
 
-        /(?:youtube\.com\/shorts\/)([^?\s]+)/i,
+        /youtube\.com\/shorts\/([^?\s]+)/i,
 
-        /(?:youtube\.com\/embed\/)([^?\s]+)/i
+        /youtube\.com\/embed\/([^?\s]+)/i
 
     ];
 
-    for (const pattern of patterns) {
 
-        const match = url.match(pattern);
+    for (
+        const pattern
+        of patterns
+    ) {
+
+        const match =
+            url.match(pattern);
+
 
         if (match) {
+
             return match[1];
         }
     }
 
+
     return null;
 }
 
-function createYouTubePreview(content) {
+
+function createYouTubePreview(
+    content
+) {
 
     if (!content) return "";
 
-    const youtubeRegex =
+
+    const urlRegex =
         /https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=[^\s]+|youtu\.be\/[^\s]+|youtube\.com\/shorts\/[^\s]+)/i;
 
+
     const match =
-        content.match(youtubeRegex);
+        content.match(
+            urlRegex
+        );
+
 
     if (!match) {
+
         return "";
     }
 
-    const url = match[0];
 
     const videoId =
-        getYouTubeId(url);
+        getYouTubeId(
+            match[0]
+        );
+
 
     if (!videoId) {
+
         return "";
     }
 
+
     return `
+
         <div class="youtube-preview">
 
             <iframe
-                src="https://www.youtube.com/embed/${encodeURIComponent(videoId)}"
+                src="https://www.youtube.com/embed/${encodeURIComponent(
+                    videoId
+                )}"
                 title="YouTube video"
                 frameborder="0"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -389,31 +574,45 @@ function createYouTubePreview(content) {
             ></iframe>
 
         </div>
+
     `;
 }
+
 
 // =========================================================
 // Create Post HTML
 // =========================================================
 
-function createPostHTML(post) {
+function createPostHTML(
+    post
+) {
 
-    const tags = post.tags
-        ? post.tags
-            .split(",")
-            .map(tag => tag.trim())
-            .filter(Boolean)
-        : [];
+    const tags =
+        post.tags
+            ? post.tags
+                .split(",")
+                .map(
+                    tag =>
+                        tag.trim()
+                )
+                .filter(Boolean)
+            : [];
+
 
     const youtubePreview =
         createYouTubePreview(
             post.content
         );
 
+
     const adminButtons =
         currentUser &&
-        currentUser.is_admin === 1
+        Number(
+            currentUser.is_admin
+        ) === 1
+
         ? `
+
             <button
                 class="delete-btn"
                 data-id="${post.id}"
@@ -421,10 +620,14 @@ function createPostHTML(post) {
             >
                 삭제
             </button>
+
         `
+
         : "";
 
+
     return `
+
         <article
             class="post-card"
             data-post-id="${post.id}"
@@ -433,23 +636,31 @@ function createPostHTML(post) {
             <div class="post-top">
 
                 <span class="post-author">
-                    ${escapeHtml(post.author)}
+                    ${escapeHtml(
+                        post.author
+                    )}
                 </span>
 
                 <span class="post-date">
-                    ${formatDate(post.created_at)}
+                    ${formatDate(
+                        post.created_at
+                    )}
                 </span>
 
             </div>
 
 
             <h2 class="post-title">
-                ${escapeHtml(post.title)}
+                ${escapeHtml(
+                    post.title
+                )}
             </h2>
 
 
             <p class="post-content">
-                ${escapeHtml(post.content)}
+                ${escapeHtml(
+                    post.content
+                )}
             </p>
 
 
@@ -458,22 +669,28 @@ function createPostHTML(post) {
 
             ${
                 tags.length
+
                 ? `
+
                     <div class="post-tags">
 
                         ${
                             tags
                                 .map(
                                     tag =>
-                                    `<span>
-                                        #${escapeHtml(tag)}
-                                    </span>`
+                                        `<span>
+                                            #${escapeHtml(
+                                                tag
+                                            )}
+                                        </span>`
                                 )
                                 .join("")
                         }
 
                     </div>
+
                 `
+
                 : ""
             }
 
@@ -488,13 +705,16 @@ function createPostHTML(post) {
                     ♥ ${post.likes || 0}
                 </button>
 
+
                 ${adminButtons}
 
             </div>
 
         </article>
+
     `;
 }
+
 
 // =========================================================
 // Post Events
@@ -502,85 +722,206 @@ function createPostHTML(post) {
 
 function attachPostEvents() {
 
+
     // 좋아요
+
     document
-        .querySelectorAll(".like-btn")
-        .forEach(button => {
+        .querySelectorAll(
+            ".like-btn"
+        )
+        .forEach(
+            button => {
 
-            button.addEventListener(
-                "click",
-                async () => {
+                button.addEventListener(
+                    "click",
+                    async () => {
 
-                    try {
+                        try {
+
+                            const id =
+                                button.dataset.id;
+
+
+                            const result =
+                                await apiFetch(
+                                    `/api/posts/${id}/like`,
+                                    {
+                                        method:
+                                            "POST"
+                                    }
+                                );
+
+
+                            button.textContent =
+                                `♥ ${result.likes}`;
+
+                        } catch (
+                            error
+                        ) {
+
+                            alert(
+                                error.message
+                            );
+                        }
+                    }
+                );
+            }
+        );
+
+
+    // 관리자 개별 삭제
+
+    document
+        .querySelectorAll(
+            ".delete-btn"
+        )
+        .forEach(
+            button => {
+
+                button.addEventListener(
+                    "click",
+                    async () => {
 
                         const id =
                             button.dataset.id;
 
-                        const result =
+
+                        if (
+                            !confirm(
+                                "이 게시글을 삭제하시겠습니까?"
+                            )
+                        ) {
+
+                            return;
+                        }
+
+
+                        try {
+
                             await apiFetch(
-                                `/api/posts/${id}/like`,
+                                `/api/posts/${id}`,
                                 {
-                                    method: "POST"
+                                    method:
+                                        "DELETE"
                                 }
                             );
 
-                        button.textContent =
-                            `♥ ${result.likes}`;
 
-                    } catch (error) {
+                            await loadPosts(
+                                getCurrentSort()
+                            );
 
-                        alert(
-                            error.message
-                        );
+
+                        } catch (
+                            error
+                        ) {
+
+                            alert(
+                                error.message
+                            );
+                        }
                     }
-                }
-            );
-        });
-
-
-    // 관리자 게시글 삭제
-    document
-        .querySelectorAll(".delete-btn")
-        .forEach(button => {
-
-            button.addEventListener(
-                "click",
-                async () => {
-
-                    const id =
-                        button.dataset.id;
-
-                    if (
-                        !confirm(
-                            "이 게시글을 삭제하시겠습니까?"
-                        )
-                    ) {
-                        return;
-                    }
-
-                    try {
-
-                        await apiFetch(
-                            `/api/posts/${id}`,
-                            {
-                                method: "DELETE"
-                            }
-                        );
-
-                        await loadPosts(
-                            "latest"
-                        );
-
-                    } catch (error) {
-
-                        alert(
-                            error.message
-                        );
-                    }
-                }
-            );
-        });
+                );
+            }
+        );
 }
+
+
+// =========================================================
+// Delete All Posts
+// =========================================================
+
+async function deleteAllPosts() {
+
+    if (
+        !currentUser ||
+        Number(
+            currentUser.is_admin
+        ) !== 1
+    ) {
+
+        alert(
+            "관리자만 사용할 수 있습니다."
+        );
+
+        return;
+    }
+
+
+    const first =
+        confirm(
+            "정말 모든 게시물을 삭제하시겠습니까?"
+        );
+
+
+    if (!first) return;
+
+
+    const second =
+        confirm(
+            "⚠️ 모든 게시물이 영구적으로 삭제됩니다.\n\n계속하시겠습니까?"
+        );
+
+
+    if (!second) return;
+
+
+    try {
+
+        await apiFetch(
+            "/api/admin/posts",
+            {
+                method:
+                    "DELETE"
+            }
+        );
+
+
+        alert(
+            "모든 게시물이 삭제되었습니다."
+        );
+
+
+        await loadPosts(
+            "latest"
+        );
+
+
+    } catch (
+        error
+    ) {
+
+        alert(
+            error.message
+        );
+    }
+}
+
+
+// =========================================================
+// Current Sort
+// =========================================================
+
+function getCurrentSort() {
+
+    const select =
+        document.getElementById(
+            "sortSelect"
+        );
+
+
+    if (
+        select &&
+        select.value === "popular"
+    ) {
+
+        return "popular";
+    }
+
+
+    return "latest";
+}
+
 
 // =========================================================
 // Create Post
@@ -601,132 +942,95 @@ async function createPost(
         return;
     }
 
+
     await apiFetch(
         "/api/posts",
         {
             method: "POST",
 
-            body: JSON.stringify({
-                title,
-                content,
-                tags
-            })
+            body:
+                JSON.stringify({
+                    title,
+                    content,
+                    tags
+                })
         }
     );
 
+
     closeModal();
+
 
     await loadPosts(
         "latest"
     );
+
 
     alert(
         "게시물이 등록되었습니다!"
     );
 }
 
-// =========================================================
-// Admin - Delete All Posts
-// =========================================================
-
-async function deleteAllPosts() {
-
-    if (
-        !currentUser ||
-        currentUser.is_admin !== 1
-    ) {
-
-        alert(
-            "관리자만 사용할 수 있습니다."
-        );
-
-        return;
-    }
-
-    const confirmed =
-        confirm(
-            "정말 모든 게시물을 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다."
-        );
-
-    if (!confirmed) {
-        return;
-    }
-
-    const secondConfirm =
-        confirm(
-            "⚠️ 모든 게시물이 영구적으로 삭제됩니다.\n\n계속하시겠습니까?"
-        );
-
-    if (!secondConfirm) {
-        return;
-    }
-
-    try {
-
-        await apiFetch(
-            "/api/admin/posts",
-            {
-                method: "DELETE"
-            }
-        );
-
-        alert(
-            "모든 게시물이 삭제되었습니다."
-        );
-
-        await loadPosts(
-            "latest"
-        );
-
-    } catch (error) {
-
-        alert(
-            error.message
-        );
-    }
-}
 
 // =========================================================
 // Modal
 // =========================================================
 
-function openModal(content) {
+function openModal(
+    content
+) {
 
     let modal =
-        document.getElementById("modal");
+        document.getElementById(
+            "modal"
+        );
+
 
     if (!modal) {
 
         modal =
-            document.createElement("div");
+            document.createElement(
+                "div"
+            );
 
-        modal.id = "modal";
-        modal.className = "modal";
+        modal.id =
+            "modal";
+
+        modal.className =
+            "modal";
 
         document.body.appendChild(
             modal
         );
     }
 
-    modal.innerHTML = content;
+
+    modal.innerHTML =
+        content;
+
 
     modal.classList.add(
         "active"
     );
 
+
     modal
-        .querySelector(".close")
+        .querySelector(
+            ".close"
+        )
         ?.addEventListener(
             "click",
             closeModal
         );
+
 
     modal.addEventListener(
         "click",
         event => {
 
             if (
-                event.target === modal
+                event.target ===
+                modal
             ) {
 
                 closeModal();
@@ -739,10 +1043,14 @@ function openModal(content) {
     );
 }
 
+
 function closeModal() {
 
     const modal =
-        document.getElementById("modal");
+        document.getElementById(
+            "modal"
+        );
+
 
     if (modal) {
 
@@ -750,9 +1058,11 @@ function closeModal() {
             "active"
         );
 
-        modal.innerHTML = "";
+        modal.innerHTML =
+            "";
     }
 }
+
 
 // =========================================================
 // Login Modal
@@ -823,13 +1133,17 @@ function openLoginModal() {
 
     `);
 
+
     document
-        .getElementById("loginForm")
+        .getElementById(
+            "loginForm"
+        )
         ?.addEventListener(
             "submit",
             async event => {
 
                 event.preventDefault();
+
 
                 const username =
                     document
@@ -838,12 +1152,14 @@ function openLoginModal() {
                         )
                         .value;
 
+
                 const password =
                     document
                         .getElementById(
                             "loginPassword"
                         )
                         .value;
+
 
                 try {
 
@@ -852,7 +1168,9 @@ function openLoginModal() {
                         password
                     );
 
-                } catch (error) {
+                } catch (
+                    error
+                ) {
 
                     document
                         .getElementById(
@@ -864,6 +1182,7 @@ function openLoginModal() {
             }
         );
 
+
     document
         .getElementById(
             "registerSwitch"
@@ -873,6 +1192,7 @@ function openLoginModal() {
             showRegisterForm
         );
 }
+
 
 // =========================================================
 // Register Modal
@@ -943,13 +1263,17 @@ function showRegisterForm() {
 
     `);
 
+
     document
-        .getElementById("registerForm")
+        .getElementById(
+            "registerForm"
+        )
         ?.addEventListener(
             "submit",
             async event => {
 
                 event.preventDefault();
+
 
                 const username =
                     document
@@ -958,12 +1282,14 @@ function showRegisterForm() {
                         )
                         .value;
 
+
                 const password =
                     document
                         .getElementById(
                             "registerPassword"
                         )
                         .value;
+
 
                 try {
 
@@ -972,7 +1298,9 @@ function showRegisterForm() {
                         password
                     );
 
-                } catch (error) {
+                } catch (
+                    error
+                ) {
 
                     document
                         .getElementById(
@@ -984,6 +1312,7 @@ function showRegisterForm() {
             }
         );
 
+
     document
         .getElementById(
             "loginSwitch"
@@ -993,6 +1322,7 @@ function showRegisterForm() {
             openLoginModal
         );
 }
+
 
 // =========================================================
 // Write Modal
@@ -1010,6 +1340,7 @@ function openWriteModal() {
 
         return;
     }
+
 
     openModal(`
 
@@ -1065,13 +1396,17 @@ function openWriteModal() {
 
     `);
 
+
     document
-        .getElementById("postForm")
+        .getElementById(
+            "postForm"
+        )
         ?.addEventListener(
             "submit",
             async event => {
 
                 event.preventDefault();
+
 
                 const title =
                     document
@@ -1080,6 +1415,7 @@ function openWriteModal() {
                         )
                         .value;
 
+
                 const content =
                     document
                         .getElementById(
@@ -1087,12 +1423,14 @@ function openWriteModal() {
                         )
                         .value;
 
+
                 const tags =
                     document
                         .getElementById(
                             "postTags"
                         )
                         .value;
+
 
                 try {
 
@@ -1102,7 +1440,9 @@ function openWriteModal() {
                         tags
                     );
 
-                } catch (error) {
+                } catch (
+                    error
+                ) {
 
                     alert(
                         error.message
@@ -1111,6 +1451,7 @@ function openWriteModal() {
             }
         );
 }
+
 
 // =========================================================
 // Helpers
@@ -1122,8 +1463,12 @@ function formatDate(
 
     if (!dateString) return "";
 
+
     const date =
-        new Date(dateString);
+        new Date(
+            dateString
+        );
+
 
     return date.toLocaleString(
         "ko-KR",
@@ -1136,6 +1481,7 @@ function formatDate(
         }
     );
 }
+
 
 function escapeHtml(
     value
@@ -1166,6 +1512,7 @@ function escapeHtml(
         );
 }
 
+
 // =========================================================
 // Page Events
 // =========================================================
@@ -1180,14 +1527,16 @@ document.addEventListener(
             "latest"
         );
 
+
         // =====================================================
-        // 최신 / 인기
+        // 최신 / 인기 탭
         // =====================================================
 
         const tabs =
             document.querySelectorAll(
                 ".tabs button"
             );
+
 
         tabs.forEach(
             (button, index) => {
@@ -1198,15 +1547,18 @@ document.addEventListener(
 
                         tabs.forEach(
                             btn => {
+
                                 btn.classList.remove(
                                     "selected"
                                 );
                             }
                         );
 
+
                         button.classList.add(
                             "selected"
                         );
+
 
                         if (index === 0) {
 
@@ -1220,40 +1572,63 @@ document.addEventListener(
                                 "popular"
                             );
                         }
+
+
+                        const select =
+                            document.getElementById(
+                                "sortSelect"
+                            );
+
+
+                        if (select) {
+
+                            select.value =
+                                index === 0
+                                    ? "latest"
+                                    : "popular";
+                        }
                     }
                 );
             }
         );
 
+
         // =====================================================
-        // Select
+        // 정렬 Select
         // =====================================================
 
         const sortSelect =
-            document.querySelector(
-                ".feed-header select"
+            document.getElementById(
+                "sortSelect"
             );
+
 
         sortSelect?.addEventListener(
             "change",
             async () => {
 
+                const sort =
+                    sortSelect.value;
+
+
+                await loadPosts(
+                    sort
+                );
+
+
+                tabs.forEach(
+                    btn => {
+
+                        btn.classList.remove(
+                            "selected"
+                        );
+                    }
+                );
+
+
                 if (
-                    sortSelect.value ===
-                    "인기순"
+                    sort === "popular"
                 ) {
-
-                    await loadPosts(
-                        "popular"
-                    );
-
-                    tabs.forEach(
-                        btn => {
-                            btn.classList.remove(
-                                "selected"
-                            );
-                        }
-                    );
 
                     tabs[1]
                         ?.classList.add(
@@ -1262,18 +1637,6 @@ document.addEventListener(
 
                 } else {
 
-                    await loadPosts(
-                        "latest"
-                    );
-
-                    tabs.forEach(
-                        btn => {
-                            btn.classList.remove(
-                                "selected"
-                            );
-                        }
-                    );
-
                     tabs[0]
                         ?.classList.add(
                             "selected"
@@ -1281,6 +1644,7 @@ document.addEventListener(
                 }
             }
         );
+
 
         // =====================================================
         // 글쓰기
@@ -1295,55 +1659,21 @@ document.addEventListener(
                 openWriteModal
             );
 
+
         // =====================================================
-        // 관리자 전체 삭제
+        // 전체 게시물 삭제
         // =====================================================
 
-        if (
-            currentUser &&
-            currentUser.is_admin === 1
-        ) {
+        document
+            .getElementById(
+                "deleteAllPostsBtn"
+            )
+            ?.addEventListener(
+                "click",
+                deleteAllPosts
+            );
 
-            const feedHeader =
-                document.querySelector(
-                    ".feed-header"
-                );
 
-            if (feedHeader) {
-
-                const existing =
-                    document.getElementById(
-                        "deleteAllPostsBtn"
-                    );
-
-                if (!existing) {
-
-                    const button =
-                        document.createElement(
-                            "button"
-                        );
-
-                    button.id =
-                        "deleteAllPostsBtn";
-
-                    button.className =
-                        "delete-all-btn";
-
-                    button.type = "button";
-
-                    button.textContent =
-                        "전체 게시물 삭제";
-
-                    button.addEventListener(
-                        "click",
-                        deleteAllPosts
-                    );
-
-                    feedHeader.appendChild(
-                        button
-                    );
-                }
-            }
-        }
+        updateAdminUI();
     }
 );
