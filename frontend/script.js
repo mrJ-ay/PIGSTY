@@ -334,9 +334,9 @@ function createPostHTML(post) {
             </h2>
 
 
-            <p class="post-content">
-                ${escapeHtml(post.content)}
-            </p>
+            <div class="post-content">
+                ${formatPostContent(post.content)}
+            </div>
 
 
             ${
@@ -989,6 +989,42 @@ function openWriteModal() {
 
             }
         );
+}
+
+
+// =========================
+// YouTube Preview
+// =========================
+
+function formatPostContent(content) {
+
+    const escaped =
+        escapeHtml(content);
+
+
+    const youtubeRegex =
+        /https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/g;
+
+
+    return escaped.replace(
+        youtubeRegex,
+        (match, videoId) => {
+
+            return `
+                <div class="youtube-preview">
+
+                    <iframe
+                        src="https://www.youtube.com/embed/${videoId}"
+                        title="YouTube video"
+                        frameborder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowfullscreen
+                    ></iframe>
+
+                </div>
+            `;
+        }
+    );
 }
 
 
