@@ -1,88 +1,47 @@
-const API =
-    "https://pigsty-backend.onrender.com";
+const API = "https://pigsty-backend.onrender.com";
 
-let token =
-    localStorage.getItem(
-        "pigsty_token"
-    );
-
+let token = localStorage.getItem("pigsty_token");
 let currentUser = null;
-
 let allPosts = [];
-
 let currentSort = "latest";
-
 let searchInput = null;
 
-
-// =========================================================
-// DOM
-// =========================================================
-
-const authArea =
-    document.getElementById(
-        "authArea"
-    );
+const authArea = document.getElementById("authArea");
 
 
 // =========================================================
 // API
 // =========================================================
 
-async function apiFetch(
-    url,
-    options = {}
-) {
+async function apiFetch(url, options = {}) {
 
     const headers = {
-        "Content-Type":
-            "application/json",
-
+        "Content-Type": "application/json",
         ...(options.headers || {})
     };
 
-
     if (token) {
-
-        headers["Authorization"] =
-            `Bearer ${token}`;
-
+        headers["Authorization"] = `Bearer ${token}`;
     }
 
-
-    const response =
-        await fetch(
-            API + url,
-            {
-                ...options,
-                headers
-            }
-        );
-
+    const response = await fetch(API + url, {
+        ...options,
+        headers
+    });
 
     let data = {};
 
     try {
-
-        data =
-            await response.json();
-
+        data = await response.json();
     } catch {
-
         data = {};
-
     }
-
 
     if (!response.ok) {
-
         throw new Error(
-            data.detail ||
-            `HTTP ${response.status}`
+            data.detail || `HTTP ${response.status}`
         );
-
     }
-
 
     return data;
 }
@@ -95,40 +54,29 @@ async function apiFetch(
 async function loadUser() {
 
     if (!token) {
-
         currentUser = null;
-
         updateAuthUI();
-
         updateAdminUI();
-
         return;
-
     }
-
 
     try {
 
-        currentUser =
-            await apiFetch(
-                "/api/auth/me"
-            );
+        currentUser = await apiFetch(
+            "/api/auth/me"
+        );
 
     } catch {
 
         token = null;
-
         currentUser = null;
 
         localStorage.removeItem(
             "pigsty_token"
         );
-
     }
 
-
     updateAuthUI();
-
     updateAdminUI();
 }
 
@@ -140,7 +88,6 @@ async function loadUser() {
 function updateAuthUI() {
 
     if (!authArea) return;
-
 
     if (currentUser) {
 
@@ -166,11 +113,8 @@ function updateAuthUI() {
 
         `;
 
-
         document
-            .getElementById(
-                "logoutBtn"
-            )
+            .getElementById("logoutBtn")
             ?.addEventListener(
                 "click",
                 logout
@@ -190,16 +134,12 @@ function updateAuthUI() {
 
         `;
 
-
         document
-            .getElementById(
-                "loginBtn"
-            )
+            .getElementById("loginBtn")
             ?.addEventListener(
                 "click",
                 openLoginModal
             );
-
     }
 }
 
@@ -215,25 +155,15 @@ function updateAdminUI() {
             "deleteAllPostsBtn"
         );
 
-
     if (!button) return;
-
 
     if (
         currentUser &&
-        Number(
-            currentUser.is_admin
-        ) === 1
+        Number(currentUser.is_admin) === 1
     ) {
-
-        button.style.display =
-            "block";
-
+        button.style.display = "block";
     } else {
-
-        button.style.display =
-            "none";
-
+        button.style.display = "none";
     }
 }
 
@@ -245,23 +175,18 @@ function updateAdminUI() {
 function logout() {
 
     token = null;
-
     currentUser = null;
 
     localStorage.removeItem(
         "pigsty_token"
     );
 
-
     updateAuthUI();
-
     updateAdminUI();
 
+    loadPosts("latest");
 
-    loadPosts(
-        "latest"
-    );
-
+    setHeaderActive(0);
 }
 
 
@@ -274,44 +199,34 @@ async function login(
     password
 ) {
 
-    const data =
-        await apiFetch(
-            "/api/auth/login",
-            {
-                method: "POST",
+    const data = await apiFetch(
+        "/api/auth/login",
+        {
+            method: "POST",
 
-                body:
-                    JSON.stringify({
-                        username,
-                        password
-                    })
-            }
-        );
+            body: JSON.stringify({
+                username,
+                password
+            })
+        }
+    );
 
-
-    token =
-        data.access_token;
-
+    token = data.access_token;
 
     localStorage.setItem(
         "pigsty_token",
         token
     );
 
-
     await loadUser();
 
     closeModal();
 
-    await loadPosts(
-        "latest"
-    );
+    await loadPosts("latest");
 
+    setHeaderActive(0);
 
-    alert(
-        "로그인 성공!"
-    );
-
+    alert("로그인 성공!");
 }
 
 
@@ -329,22 +244,18 @@ async function register(
         {
             method: "POST",
 
-            body:
-                JSON.stringify({
-                    username,
-                    password
-                })
+            body: JSON.stringify({
+                username,
+                password
+            })
         }
     );
-
 
     alert(
         "회원가입 성공! 이제 로그인하세요."
     );
 
-
     openLoginModal();
-
 }
 
 
@@ -361,12 +272,9 @@ async function loadPosts(
             "posts"
         );
 
-
     if (!postsContainer) return;
 
-
     currentSort = sort;
-
 
     postsContainer.innerHTML = `
 
@@ -384,7 +292,6 @@ async function loadPosts(
 
     `;
 
-
     try {
 
         const posts =
@@ -392,24 +299,18 @@ async function loadPosts(
                 "/api/posts"
             );
 
-
         if (!Array.isArray(posts)) {
-
             throw new Error(
                 "게시물 데이터가 올바르지 않습니다."
             );
-
         }
 
-
         allPosts = posts;
-
 
         renderPosts(
             allPosts,
             sort
         );
-
 
     } catch (error) {
 
@@ -417,7 +318,6 @@ async function loadPosts(
             "게시물 로드 오류:",
             error
         );
-
 
         postsContainer.innerHTML = `
 
@@ -436,9 +336,7 @@ async function loadPosts(
             </div>
 
         `;
-
     }
-
 }
 
 
@@ -456,18 +354,11 @@ function renderPosts(
             "posts"
         );
 
-
     if (!postsContainer) return;
-
 
     currentSort = sort;
 
-
-    const sortedPosts =
-        [...posts];
-
-
-    // 최신순
+    const sortedPosts = [...posts];
 
     if (sort === "latest") {
 
@@ -480,11 +371,7 @@ function renderPosts(
                     a.created_at
                 )
         );
-
     }
-
-
-    // 인기순
 
     if (sort === "popular") {
 
@@ -495,15 +382,9 @@ function renderPosts(
                     (b.likes || 0) -
                     (a.likes || 0);
 
-
-                if (
-                    likeDifference !== 0
-                ) {
-
+                if (likeDifference !== 0) {
                     return likeDifference;
-
                 }
-
 
                 return (
                     new Date(
@@ -513,12 +394,9 @@ function renderPosts(
                         a.created_at
                     )
                 );
-
             }
         );
-
     }
-
 
     if (!sortedPosts.length) {
 
@@ -531,7 +409,7 @@ function renderPosts(
                 </h3>
 
                 <p>
-                    다른 검색어를 입력해보세요.
+                    게시물이 아직 없습니다.
                 </p>
 
             </div>
@@ -539,33 +417,24 @@ function renderPosts(
         `;
 
         return;
-
     }
-
 
     postsContainer.innerHTML =
         sortedPosts
-            .map(
-                createPostHTML
-            )
+            .map(createPostHTML)
             .join("");
 
-
     attachPostEvents();
-
 }
 
 
 // =========================================================
-// YouTube ID
+// YouTube
 // =========================================================
 
-function getYouTubeId(
-    url
-) {
+function getYouTubeId(url) {
 
     if (!url) return null;
-
 
     const patterns = [
 
@@ -579,33 +448,18 @@ function getYouTubeId(
 
     ];
 
+    for (const pattern of patterns) {
 
-    for (
-        const pattern
-        of patterns
-    ) {
-
-        const match =
-            url.match(pattern);
-
+        const match = url.match(pattern);
 
         if (match) {
-
             return match[1];
-
         }
-
     }
 
-
     return null;
-
 }
 
-
-// =========================================================
-// YouTube Preview
-// =========================================================
 
 function createYouTubePreview(
     content
@@ -613,36 +467,18 @@ function createYouTubePreview(
 
     if (!content) return "";
 
-
     const urlRegex =
         /https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=[^\s]+|youtu\.be\/[^\s]+|youtube\.com\/shorts\/[^\s]+)/i;
 
-
     const match =
-        content.match(
-            urlRegex
-        );
+        content.match(urlRegex);
 
-
-    if (!match) {
-
-        return "";
-
-    }
-
+    if (!match) return "";
 
     const videoId =
-        getYouTubeId(
-            match[0]
-        );
+        getYouTubeId(match[0]);
 
-
-    if (!videoId) {
-
-        return "";
-
-    }
-
+    if (!videoId) return "";
 
     return `
 
@@ -656,12 +492,12 @@ function createYouTubePreview(
                 frameborder="0"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowfullscreen
+                loading="lazy"
             ></iframe>
 
         </div>
 
     `;
-
 }
 
 
@@ -669,146 +505,129 @@ function createYouTubePreview(
 // Post HTML
 // =========================================================
 
-function createPostHTML(
-    post
-) {
+function createPostHTML(post) {
 
-    const id =
-        post.id;
-
-
-    const title =
-        escapeHtml(
-            post.title
-        );
-
-
-    const content =
-        escapeHtml(
-            post.content
-        );
-
-
-    const author =
-        escapeHtml(
-            post.author ||
-            "익명"
-        );
-
-
-    const likes =
-        Number(
-            post.likes || 0
-        );
-
-
-    const comments =
-        Number(
-            post.comments_count ||
-            post.comment_count ||
-            0
-        );
-
+    const tags =
+        post.tags
+            ? post.tags
+                .split(",")
+                .map(tag => tag.trim())
+                .filter(Boolean)
+            : [];
 
     const youtubePreview =
         createYouTubePreview(
             post.content
         );
 
+    const adminButtons =
+        currentUser &&
+        Number(currentUser.is_admin) === 1
+
+            ? `
+
+                <button
+                    class="delete-btn"
+                    data-id="${post.id}"
+                    type="button"
+                >
+                    삭제
+                </button>
+
+            `
+
+            : "";
 
     return `
 
         <article
             class="post-card"
-            data-id="${id}"
+            data-post-id="${post.id}"
         >
 
-            <div class="post-header">
+            <div class="post-top">
 
-                <div>
-
-                    <h2 class="post-title">
-                        ${title}
-                    </h2>
-
-                    <div class="post-meta">
-
-                        <span>
-                            ${author}
-                        </span>
-
-                        <span>
-                            ${formatDate(
-                                post.created_at
-                            )}
-                        </span>
-
-                    </div>
-
-                </div>
-
-
-                ${
-                    currentUser &&
-                    (
-                        currentUser.username ===
-                        post.author ||
-                        Number(
-                            currentUser.is_admin
-                        ) === 1
-                    )
-                    ?
-                    `
-                        <button
-                            class="delete-btn"
-                            data-id="${id}"
-                            type="button"
-                        >
-                            삭제
-                        </button>
-                    `
-                    :
-                    ""
-                }
-
-            </div>
-
-
-            <div class="post-content">
-
-                <p>
-                    ${content.replace(
-                        /\n/g,
-                        "<br>"
+                <span class="post-author">
+                    ${escapeHtml(
+                        post.author
                     )}
-                </p>
+                </span>
 
-                ${youtubePreview}
+                <span class="post-date">
+                    ${formatDate(
+                        post.created_at
+                    )}
+                </span>
 
             </div>
 
 
-            <div class="post-footer">
+            <h2 class="post-title">
+
+                ${escapeHtml(
+                    post.title
+                )}
+
+            </h2>
+
+
+            <p class="post-content">
+
+                ${escapeHtml(
+                    post.content
+                )}
+
+            </p>
+
+
+            ${youtubePreview}
+
+
+            ${
+                tags.length
+
+                    ? `
+
+                        <div class="post-tags">
+
+                            ${
+                                tags
+                                    .map(
+                                        tag =>
+                                            `<span>
+                                                #${escapeHtml(
+                                                    tag
+                                                )}
+                                            </span>`
+                                    )
+                                    .join("")
+                            }
+
+                        </div>
+
+                    `
+
+                    : ""
+            }
+
+
+            <div class="post-actions">
 
                 <button
                     class="like-btn"
-                    data-id="${id}"
+                    data-id="${post.id}"
                     type="button"
                 >
-                    ♡ ${likes}
+                    ♥ ${post.likes || 0}
                 </button>
 
-
-                <span class="comment-count">
-                    💬 ${comments}
-                </span>
+                ${adminButtons}
 
             </div>
 
         </article>
 
     `;
-
 }
 
 
@@ -819,155 +638,230 @@ function createPostHTML(
 function attachPostEvents() {
 
     document
-        .querySelectorAll(
-            ".like-btn"
-        )
-        .forEach(
-            button => {
+        .querySelectorAll(".like-btn")
+        .forEach(button => {
 
-                button.addEventListener(
-                    "click",
-                    async () => {
+            button.addEventListener(
+                "click",
+                async () => {
 
-                        if (!token) {
+                    if (!token) {
 
-                            alert(
-                                "로그인이 필요합니다."
-                            );
+                        alert(
+                            "로그인이 필요합니다."
+                        );
 
-                            openLoginModal();
+                        openLoginModal();
 
-                            return;
-
-                        }
-
-
-                        const id =
-                            button.dataset.id;
-
-
-                        try {
-
-                            const result =
-                                await apiFetch(
-                                    `/api/posts/${id}/like`,
-                                    {
-                                        method:
-                                            "POST"
-                                    }
-                                );
-
-
-                            button.innerHTML =
-                                `♡ ${
-                                    result.likes ??
-                                    0
-                                }`;
-
-
-                            const post =
-                                allPosts.find(
-                                    item =>
-                                        String(
-                                            item.id
-                                        ) ===
-                                        String(id)
-                                );
-
-
-                            if (post) {
-
-                                post.likes =
-                                    result.likes ??
-                                    post.likes ??
-                                    0;
-
-                            }
-
-
-                            if (
-                                currentSort ===
-                                "popular"
-                            ) {
-
-                                renderPosts(
-                                    allPosts,
-                                    "popular"
-                                );
-
-                            }
-
-                        } catch (error) {
-
-                            alert(
-                                error.message
-                            );
-
-                        }
-
+                        return;
                     }
-                );
 
-            }
-        );
-
-
-    document
-        .querySelectorAll(
-            ".delete-btn"
-        )
-        .forEach(
-            button => {
-
-                button.addEventListener(
-                    "click",
-                    async () => {
+                    try {
 
                         const id =
                             button.dataset.id;
 
-
-                        if (
-                            !confirm(
-                                "정말 삭제하시겠습니까?"
-                            )
-                        ) {
-
-                            return;
-
-                        }
-
-
-                        try {
-
+                        const result =
                             await apiFetch(
-                                `/api/posts/${id}`,
+                                `/api/posts/${id}/like`,
                                 {
-                                    method:
-                                        "DELETE"
+                                    method: "POST"
                                 }
                             );
 
+                        button.textContent =
+                            `♥ ${result.likes}`;
 
-                            await loadPosts(
-                                currentSort
+                        const post =
+                            allPosts.find(
+                                item =>
+                                    String(
+                                        item.id
+                                    ) ===
+                                    String(id)
                             );
 
-
-                        } catch (error) {
-
-                            alert(
-                                error.message
-                            );
-
+                        if (post) {
+                            post.likes =
+                                result.likes;
                         }
 
-                    }
-                );
+                    } catch (error) {
 
+                        alert(
+                            error.message
+                        );
+                    }
+                }
+            );
+        });
+
+
+    document
+        .querySelectorAll(".delete-btn")
+        .forEach(button => {
+
+            button.addEventListener(
+                "click",
+                async () => {
+
+                    const id =
+                        button.dataset.id;
+
+                    if (
+                        !confirm(
+                            "이 게시글을 삭제하시겠습니까?"
+                        )
+                    ) {
+                        return;
+                    }
+
+                    try {
+
+                        await apiFetch(
+                            `/api/posts/${id}`,
+                            {
+                                method: "DELETE"
+                            }
+                        );
+
+                        await loadPosts(
+                            getCurrentSort()
+                        );
+
+                    } catch (error) {
+
+                        alert(
+                            error.message
+                        );
+                    }
+                }
+            );
+        });
+}
+
+
+// =========================================================
+// Delete All Posts
+// =========================================================
+
+async function deleteAllPosts() {
+
+    if (
+        !currentUser ||
+        Number(currentUser.is_admin) !== 1
+    ) {
+
+        alert(
+            "관리자만 사용할 수 있습니다."
+        );
+
+        return;
+    }
+
+    if (
+        !confirm(
+            "정말 모든 게시물을 삭제하시겠습니까?"
+        )
+    ) {
+        return;
+    }
+
+    if (
+        !confirm(
+            "⚠️ 모든 게시물이 영구적으로 삭제됩니다.\n\n계속하시겠습니까?"
+        )
+    ) {
+        return;
+    }
+
+    try {
+
+        await apiFetch(
+            "/api/admin/posts",
+            {
+                method: "DELETE"
             }
         );
 
+        alert(
+            "모든 게시물이 삭제되었습니다."
+        );
+
+        await loadPosts("latest");
+
+    } catch (error) {
+
+        alert(
+            error.message
+        );
+    }
+}
+
+
+// =========================================================
+// Current Sort
+// =========================================================
+
+function getCurrentSort() {
+
+    const select =
+        document.getElementById(
+            "sortSelect"
+        );
+
+    if (
+        select &&
+        select.value === "popular"
+    ) {
+        return "popular";
+    }
+
+    return currentSort || "latest";
+}
+
+
+// =========================================================
+// Create Post
+// =========================================================
+
+async function createPost(
+    title,
+    content,
+    tags
+) {
+
+    if (!token) {
+
+        alert(
+            "로그인이 필요합니다."
+        );
+
+        return;
+    }
+
+    await apiFetch(
+        "/api/posts",
+        {
+            method: "POST",
+
+            body: JSON.stringify({
+                title,
+                content,
+                tags
+            })
+        }
+    );
+
+    closeModal();
+
+    await loadPosts("latest");
+
+    setHeaderActive(0);
+
+    alert(
+        "게시물이 등록되었습니다!"
+    );
 }
 
 
@@ -975,20 +869,75 @@ function attachPostEvents() {
 // Modal
 // =========================================================
 
+function openModal(content) {
+
+    let modal =
+        document.getElementById(
+            "modal"
+        );
+
+    if (!modal) {
+
+        modal =
+            document.createElement(
+                "div"
+            );
+
+        modal.id = "modal";
+        modal.className = "modal";
+
+        document.body.appendChild(
+            modal
+        );
+    }
+
+    modal.innerHTML = content;
+
+    modal.classList.add(
+        "active"
+    );
+
+    modal
+        .querySelector(".close")
+        ?.addEventListener(
+            "click",
+            closeModal
+        );
+
+    modal.addEventListener(
+        "click",
+        event => {
+
+            if (
+                event.target ===
+                modal
+            ) {
+                closeModal();
+            }
+
+        },
+        {
+            once: true
+        }
+    );
+}
+
+
 function closeModal() {
 
     const modal =
-        document.querySelector(
-            ".modal"
+        document.getElementById(
+            "modal"
         );
-
 
     if (modal) {
 
-        modal.remove();
+        modal.classList.remove(
+            "active"
+        );
 
+        modal.innerHTML = "";
     }
-
 }
 
 
@@ -998,22 +947,9 @@ function closeModal() {
 
 function openLoginModal() {
 
-    closeModal();
+    openModal(`
 
-
-    const modal =
-        document.createElement(
-            "div"
-        );
-
-
-    modal.className =
-        "modal";
-
-
-    modal.innerHTML = `
-
-        <div class="modal-content">
+        <div class="modal-box">
 
             <button
                 class="close"
@@ -1047,6 +983,7 @@ function openLoginModal() {
 
 
                 <button
+                    class="submit"
                     type="submit"
                 >
                     로그인
@@ -1056,71 +993,45 @@ function openLoginModal() {
 
 
             <button
+                class="switch-auth"
                 id="registerSwitch"
                 type="button"
             >
-                회원가입
+                계정이 없나요? 회원가입
             </button>
+
+
+            <p
+                class="auth-message"
+                id="authMessage"
+            ></p>
 
         </div>
 
-    `;
-
-
-    document.body.appendChild(
-        modal
-    );
-
-
-    modal
-        .querySelector(
-            ".close"
-        )
-        ?.addEventListener(
-            "click",
-            closeModal
-        );
-
-
-    modal.addEventListener(
-        "click",
-        event => {
-
-            if (
-                event.target ===
-                modal
-            ) {
-
-                closeModal();
-
-            }
-
-        }
-    );
+    `);
 
 
     document
-        .getElementById(
-            "loginForm"
-        )
+        .getElementById("loginForm")
         ?.addEventListener(
             "submit",
             async event => {
 
                 event.preventDefault();
 
-
                 const username =
-                    document.getElementById(
-                        "loginUsername"
-                    ).value.trim();
-
+                    document
+                        .getElementById(
+                            "loginUsername"
+                        )
+                        .value;
 
                 const password =
-                    document.getElementById(
-                        "loginPassword"
-                    ).value;
-
+                    document
+                        .getElementById(
+                            "loginPassword"
+                        )
+                        .value;
 
                 try {
 
@@ -1131,12 +1042,13 @@ function openLoginModal() {
 
                 } catch (error) {
 
-                    alert(
-                        error.message
-                    );
-
+                    document
+                        .getElementById(
+                            "authMessage"
+                        )
+                        .textContent =
+                        error.message;
                 }
-
             }
         );
 
@@ -1149,7 +1061,6 @@ function openLoginModal() {
             "click",
             showRegisterForm
         );
-
 }
 
 
@@ -1159,18 +1070,9 @@ function openLoginModal() {
 
 function showRegisterForm() {
 
-    const modal =
-        document.querySelector(
-            ".modal"
-        );
+    openModal(`
 
-
-    if (!modal) return;
-
-
-    modal.innerHTML = `
-
-        <div class="modal-content">
+        <div class="modal-box">
 
             <button
                 class="close"
@@ -1204,6 +1106,7 @@ function showRegisterForm() {
 
 
                 <button
+                    class="submit"
                     type="submit"
                 >
                     회원가입
@@ -1213,49 +1116,45 @@ function showRegisterForm() {
 
 
             <button
+                class="switch-auth"
                 id="loginSwitch"
                 type="button"
             >
-                로그인으로 돌아가기
+                이미 계정이 있나요? 로그인
             </button>
+
+
+            <p
+                class="auth-message"
+                id="authMessage"
+            ></p>
 
         </div>
 
-    `;
-
-
-    modal
-        .querySelector(
-            ".close"
-        )
-        ?.addEventListener(
-            "click",
-            closeModal
-        );
+    `);
 
 
     document
-        .getElementById(
-            "registerForm"
-        )
+        .getElementById("registerForm")
         ?.addEventListener(
             "submit",
             async event => {
 
                 event.preventDefault();
 
-
                 const username =
-                    document.getElementById(
-                        "registerUsername"
-                    ).value.trim();
-
+                    document
+                        .getElementById(
+                            "registerUsername"
+                        )
+                        .value;
 
                 const password =
-                    document.getElementById(
-                        "registerPassword"
-                    ).value;
-
+                    document
+                        .getElementById(
+                            "registerPassword"
+                        )
+                        .value;
 
                 try {
 
@@ -1266,12 +1165,13 @@ function showRegisterForm() {
 
                 } catch (error) {
 
-                    alert(
-                        error.message
-                    );
-
+                    document
+                        .getElementById(
+                            "authMessage"
+                        )
+                        .textContent =
+                        error.message;
                 }
-
             }
         );
 
@@ -1284,17 +1184,16 @@ function showRegisterForm() {
             "click",
             openLoginModal
         );
-
 }
 
 
 // =========================================================
-// Write Post Modal
+// Write Modal
 // =========================================================
 
 function openWriteModal() {
 
-    if (!token) {
+    if (!currentUser) {
 
         alert(
             "로그인이 필요합니다."
@@ -1303,26 +1202,11 @@ function openWriteModal() {
         openLoginModal();
 
         return;
-
     }
 
+    openModal(`
 
-    closeModal();
-
-
-    const modal =
-        document.createElement(
-            "div"
-        );
-
-
-    modal.className =
-        "modal";
-
-
-    modal.innerHTML = `
-
-        <div class="modal-content post-modal">
+        <div class="modal-box">
 
             <button
                 class="close"
@@ -1333,7 +1217,7 @@ function openWriteModal() {
 
 
             <h2>
-                글쓰기
+                게시물 작성
             </h2>
 
 
@@ -1343,15 +1227,13 @@ function openWriteModal() {
                     id="postTitle"
                     type="text"
                     placeholder="제목"
-                    maxlength="200"
                     required
                 >
 
 
                 <textarea
                     id="postContent"
-                    placeholder="내용을 입력하세요..."
-                    rows="8"
+                    placeholder="내용을 작성하세요.&#10;&#10;YouTube 링크를 넣으면 자동으로 미리보기가 표시됩니다."
                     required
                 ></textarea>
 
@@ -1359,11 +1241,12 @@ function openWriteModal() {
                 <input
                     id="postTags"
                     type="text"
-                    placeholder="태그 (예: 일상, 취미, 사진)"
+                    placeholder="태그 (쉼표로 구분)"
                 >
 
 
                 <button
+                    class="submit"
                     type="submit"
                 >
                     게시하기
@@ -1373,209 +1256,54 @@ function openWriteModal() {
 
         </div>
 
-    `;
-
-
-    document.body.appendChild(
-        modal
-    );
-
-
-    modal
-        .querySelector(
-            ".close"
-        )
-        ?.addEventListener(
-            "click",
-            closeModal
-        );
-
-
-    modal.addEventListener(
-        "click",
-        event => {
-
-            if (
-                event.target ===
-                modal
-            ) {
-
-                closeModal();
-
-            }
-
-        }
-    );
+    `);
 
 
     document
-        .getElementById(
-            "postForm"
-        )
+        .getElementById("postForm")
         ?.addEventListener(
             "submit",
             async event => {
 
                 event.preventDefault();
 
-
                 const title =
-                    document.getElementById(
-                        "postTitle"
-                    ).value.trim();
-
+                    document
+                        .getElementById(
+                            "postTitle"
+                        )
+                        .value;
 
                 const content =
-                    document.getElementById(
-                        "postContent"
-                    ).value.trim();
-
+                    document
+                        .getElementById(
+                            "postContent"
+                        )
+                        .value;
 
                 const tags =
-                    document.getElementById(
-                        "postTags"
-                    ).value.trim();
-
-
-                if (!title) {
-
-                    alert(
-                        "제목을 입력해주세요."
-                    );
-
-                    return;
-
-                }
-
-
-                if (!content) {
-
-                    alert(
-                        "내용을 입력해주세요."
-                    );
-
-                    return;
-
-                }
-
+                    document
+                        .getElementById(
+                            "postTags"
+                        )
+                        .value;
 
                 try {
 
-                    await apiFetch(
-                        "/api/posts",
-                        {
-                            method:
-                                "POST",
-
-                            body:
-                                JSON.stringify({
-                                    title,
-                                    content,
-                                    tags
-                                })
-                        }
+                    await createPost(
+                        title,
+                        content,
+                        tags
                     );
-
-
-                    closeModal();
-
-
-                    await loadPosts(
-                        "latest"
-                    );
-
-
-                    alert(
-                        "게시물이 등록되었습니다."
-                    );
-
 
                 } catch (error) {
 
                     alert(
                         error.message
                     );
-
                 }
-
             }
         );
-
-}
-
-
-// =========================================================
-// Delete All Posts
-// =========================================================
-
-async function deleteAllPosts() {
-
-    if (!currentUser) {
-
-        alert(
-            "로그인이 필요합니다."
-        );
-
-        return;
-
-    }
-
-
-    if (
-        Number(
-            currentUser.is_admin
-        ) !== 1
-    ) {
-
-        alert(
-            "관리자만 사용할 수 있습니다."
-        );
-
-        return;
-
-    }
-
-
-    if (
-        !confirm(
-            "모든 게시물을 삭제하시겠습니까?"
-        )
-    ) {
-
-        return;
-
-    }
-
-
-    try {
-
-        await apiFetch(
-            "/api/posts/all",
-            {
-                method:
-                    "DELETE"
-            }
-        );
-
-
-        await loadPosts(
-            currentSort
-        );
-
-
-        alert(
-            "전체 게시물이 삭제되었습니다."
-        );
-
-
-    } catch (error) {
-
-        alert(
-            error.message
-        );
-
-    }
-
 }
 
 
@@ -1589,12 +1317,10 @@ function formatDate(
 
     if (!dateString) return "";
 
-
     const date =
         new Date(
             dateString
         );
-
 
     return date.toLocaleString(
         "ko-KR",
@@ -1606,13 +1332,10 @@ function formatDate(
             minute: "2-digit"
         }
     );
-
 }
 
 
-function escapeHtml(
-    value
-) {
+function escapeHtml(value) {
 
     return String(
         value ?? ""
@@ -1637,7 +1360,6 @@ function escapeHtml(
             "'",
             "&#039;"
         );
-
 }
 
 
@@ -1652,43 +1374,30 @@ function openSearch() {
             "searchBox"
         );
 
-
     if (searchBox) {
 
         searchBox.classList.toggle(
             "active"
         );
 
-
         if (
             searchBox.classList.contains(
                 "active"
             )
         ) {
-
             searchInput?.focus();
-
         }
 
-
         return;
-
     }
-
 
     searchBox =
         document.createElement(
             "div"
         );
 
-
-    searchBox.id =
-        "searchBox";
-
-
-    searchBox.className =
-        "search-box";
-
+    searchBox.id = "searchBox";
+    searchBox.className = "search-box";
 
     searchBox.innerHTML = `
 
@@ -1709,17 +1418,14 @@ function openSearch() {
 
     `;
 
-
     document.body.appendChild(
         searchBox
     );
-
 
     searchInput =
         document.getElementById(
             "searchInput"
         );
-
 
     searchInput.addEventListener(
         "input",
@@ -1732,7 +1438,6 @@ function openSearch() {
         }
     );
 
-
     document
         .getElementById(
             "searchClose"
@@ -1742,20 +1447,13 @@ function openSearch() {
             closeSearch
         );
 
-
     searchBox.classList.add(
         "active"
     );
 
-
     searchInput.focus();
-
 }
 
-
-// =========================================================
-// Close Search
-// =========================================================
 
 function closeSearch() {
 
@@ -1764,43 +1462,29 @@ function closeSearch() {
             "searchBox"
         );
 
-
     if (!searchBox) return;
-
 
     searchBox.classList.remove(
         "active"
     );
 
-
     if (searchInput) {
-
         searchInput.value = "";
-
     }
-
 
     renderPosts(
         allPosts,
         currentSort
     );
-
 }
 
 
-// =========================================================
-// Filter Posts
-// =========================================================
-
-function filterPosts(
-    keyword
-) {
+function filterPosts(keyword) {
 
     const query =
         keyword
             .trim()
             .toLowerCase();
-
 
     if (!query) {
 
@@ -1810,7 +1494,208 @@ function filterPosts(
         );
 
         return;
+    }
 
+    const filtered =
+        allPosts.filter(post => {
+
+            const title =
+                String(
+                    post.title || ""
+                ).toLowerCase();
+
+            const content =
+                String(
+                    post.content || ""
+                ).toLowerCase();
+
+            const author =
+                String(
+                    post.author || ""
+                ).toLowerCase();
+
+            const tags =
+                String(
+                    post.tags || ""
+                ).toLowerCase();
+
+            return (
+                title.includes(query) ||
+                content.includes(query) ||
+                author.includes(query) ||
+                tags.includes(query)
+            );
+        });
+
+    renderPosts(
+        filtered,
+        currentSort
+    );
+}
+
+
+// =========================================================
+// Categories
+// =========================================================
+
+const PIGSTY_CATEGORIES = [
+    "의상",
+    "패션",
+    "신발",
+    "액세서리",
+    "코스튬",
+    "사진",
+    "영상",
+    "기타",
+    "소품"
+];
+
+
+function setHeaderActive(
+    activeIndex
+) {
+
+    document
+        .querySelectorAll("nav a")
+        .forEach(
+            (link, index) => {
+
+                link.classList.toggle(
+                    "active",
+                    index === activeIndex
+                );
+
+            }
+        );
+}
+
+
+// =========================================================
+// Category Page
+// =========================================================
+
+function openCategoryPage() {
+
+    const postsContainer =
+        document.getElementById(
+            "posts"
+        );
+
+    if (!postsContainer) return;
+
+    const sortSelect =
+        document.getElementById(
+            "sortSelect"
+        );
+
+    if (sortSelect) {
+
+        sortSelect.value = "latest";
+
+        sortSelect.disabled = true;
+    }
+
+    document
+        .querySelectorAll(
+            ".tabs button"
+        )
+        .forEach(
+            button => {
+
+                button.classList.remove(
+                    "selected"
+                );
+
+            }
+        );
+
+    postsContainer.innerHTML = `
+
+        <div class="category-page">
+
+            <div class="category-page-header">
+
+                <h2>
+                    카테고리
+                </h2>
+
+                <p>
+                    원하는 카테고리를 선택하세요.
+                </p>
+
+            </div>
+
+
+            <div class="category-list">
+
+                ${PIGSTY_CATEGORIES
+                    .map(
+                        category => `
+
+                            <button
+                                class="category-card"
+                                type="button"
+                                data-category="${escapeHtml(
+                                    category
+                                )}"
+                            >
+                                #${escapeHtml(
+                                    category
+                                )}
+                            </button>
+
+                        `
+                    )
+                    .join("")}
+
+            </div>
+
+        </div>
+
+    `;
+
+
+    document
+        .querySelectorAll(
+            ".category-card"
+        )
+        .forEach(
+            button => {
+
+                button.addEventListener(
+                    "click",
+                    () => {
+
+                        showCategoryPosts(
+                            button.dataset.category
+                        );
+
+                    }
+                );
+
+            }
+        );
+}
+
+
+// =========================================================
+// Category Posts
+// =========================================================
+
+function showCategoryPosts(
+    category
+) {
+
+    const sortSelect =
+        document.getElementById(
+            "sortSelect"
+        );
+
+    if (sortSelect) {
+
+        sortSelect.disabled = false;
+
+        sortSelect.value = "latest";
     }
 
 
@@ -1818,46 +1703,119 @@ function filterPosts(
         allPosts.filter(
             post => {
 
-                const title =
-                    String(
-                        post.title || ""
-                    ).toLowerCase();
-
-
-                const content =
-                    String(
-                        post.content || ""
-                    ).toLowerCase();
-
-
-                const author =
-                    String(
-                        post.author || ""
-                    ).toLowerCase();
-
-
                 const tags =
                     String(
                         post.tags || ""
-                    ).toLowerCase();
+                    )
+                        .split(",")
+                        .map(
+                            tag =>
+                                tag.trim()
+                        )
+                        .filter(Boolean);
 
 
-                return (
-                    title.includes(query) ||
-                    content.includes(query) ||
-                    author.includes(query) ||
-                    tags.includes(query)
+                return tags.some(
+                    tag =>
+                        tag.toLowerCase() ===
+                        category.toLowerCase()
                 );
 
             }
         );
 
 
-    renderPosts(
-        filtered,
-        currentSort
-    );
+    const postsContainer =
+        document.getElementById(
+            "posts"
+        );
 
+    if (!postsContainer) return;
+
+
+    const sorted =
+        [...filtered].sort(
+            (a, b) =>
+                new Date(
+                    b.created_at
+                ) -
+                new Date(
+                    a.created_at
+                )
+        );
+
+
+    postsContainer.innerHTML = `
+
+        <div class="category-result-header">
+
+            <button
+                class="category-back-btn"
+                id="categoryBackBtn"
+                type="button"
+            >
+                ← 카테고리
+            </button>
+
+
+            <h2>
+                #${escapeHtml(
+                    category
+                )}
+            </h2>
+
+
+            <p>
+                ${sorted.length}개의 게시물
+            </p>
+
+        </div>
+
+
+        <div class="posts category-posts">
+
+            ${
+                sorted.length
+
+                    ? sorted
+                        .map(
+                            createPostHTML
+                        )
+                        .join("")
+
+                    : `
+
+                        <div class="empty-posts">
+
+                            <h3>
+                                게시물이 없습니다.
+                            </h3>
+
+                            <p>
+                                이 카테고리에 등록된 게시물이 아직 없습니다.
+                            </p>
+
+                        </div>
+
+                    `
+            }
+
+        </div>
+
+    `;
+
+
+    attachPostEvents();
+
+
+    document
+        .getElementById(
+            "categoryBackBtn"
+        )
+        ?.addEventListener(
+            "click",
+            openCategoryPage
+        );
 }
 
 
@@ -1871,10 +1829,34 @@ document.addEventListener(
 
         await loadUser();
 
-
         await loadPosts(
             "latest"
         );
+
+
+        // =====================================================
+        // 상단 메뉴
+        // =====================================================
+
+        const headerLinks =
+            document.querySelectorAll(
+                "nav a"
+            );
+
+
+        const headerHome =
+            headerLinks[0];
+
+
+        const headerPopular =
+            headerLinks[1];
+
+
+        const headerCategory =
+            headerLinks[2];
+
+
+        setHeaderActive(0);
 
 
         // =====================================================
@@ -1910,6 +1892,25 @@ document.addEventListener(
                         );
 
 
+                        const select =
+                            document.getElementById(
+                                "sortSelect"
+                            );
+
+
+                        if (select) {
+
+                            select.disabled =
+                                false;
+
+                            select.value =
+                                index === 0
+                                    ? "latest"
+                                    : "popular";
+
+                        }
+
+
                         if (index === 0) {
 
                             await loadPosts(
@@ -1924,24 +1925,138 @@ document.addEventListener(
 
                         }
 
+                    }
+                );
 
-                        const select =
-                            document.getElementById(
-                                "sortSelect"
-                            );
+            }
+        );
 
 
-                        if (select) {
+        // =====================================================
+        // 상단 메뉴 - 홈
+        // =====================================================
 
-                            select.value =
-                                index === 0
-                                    ? "latest"
-                                    : "popular";
+        headerHome?.addEventListener(
+            "click",
+            async event => {
 
-                        }
+                event.preventDefault();
+
+
+                const sortSelect =
+                    document.getElementById(
+                        "sortSelect"
+                    );
+
+
+                if (sortSelect) {
+
+                    sortSelect.disabled =
+                        false;
+
+                    sortSelect.value =
+                        "latest";
+
+                }
+
+
+                await loadPosts(
+                    "latest"
+                );
+
+
+                tabs.forEach(
+                    btn => {
+
+                        btn.classList.remove(
+                            "selected"
+                        );
 
                     }
                 );
+
+
+                tabs[0]?.classList.add(
+                    "selected"
+                );
+
+
+                setHeaderActive(0);
+
+            }
+        );
+
+
+        // =====================================================
+        // 상단 메뉴 - 인기
+        // =====================================================
+
+        headerPopular?.addEventListener(
+            "click",
+            async event => {
+
+                event.preventDefault();
+
+
+                const sortSelect =
+                    document.getElementById(
+                        "sortSelect"
+                    );
+
+
+                if (sortSelect) {
+
+                    sortSelect.disabled =
+                        false;
+
+                    sortSelect.value =
+                        "popular";
+
+                }
+
+
+                await loadPosts(
+                    "popular"
+                );
+
+
+                tabs.forEach(
+                    btn => {
+
+                        btn.classList.remove(
+                            "selected"
+                        );
+
+                    }
+                );
+
+
+                tabs[1]?.classList.add(
+                    "selected"
+                );
+
+
+                setHeaderActive(1);
+
+            }
+        );
+
+
+        // =====================================================
+        // 상단 메뉴 - 카테고리
+        // =====================================================
+
+        headerCategory?.addEventListener(
+            "click",
+            event => {
+
+                event.preventDefault();
+
+
+                setHeaderActive(2);
+
+
+                openCategoryPage();
 
             }
         );
@@ -1999,73 +2114,11 @@ document.addEventListener(
 
                 }
 
-            }
-        );
 
-
-        // =====================================================
-        // 상단 메뉴 - 인기
-        // =====================================================
-
-        const headerPopular =
-            document.querySelector(
-                "nav a:nth-child(2)"
-            );
-
-
-        headerPopular?.addEventListener(
-            "click",
-            async event => {
-
-                event.preventDefault();
-
-
-                await loadPosts(
-                    "popular"
-                );
-
-
-                tabs.forEach(
-                    btn => {
-
-                        btn.classList.remove(
-                            "selected"
-                        );
-
-                    }
-                );
-
-
-                tabs[1]?.classList.add(
-                    "selected"
-                );
-
-
-                if (sortSelect) {
-
-                    sortSelect.value =
-                        "popular";
-
-                }
-
-
-                document
-                    .querySelectorAll(
-                        "nav a"
-                    )
-                    .forEach(
-                        link => {
-
-                            link.classList.remove(
-                                "active"
-                            );
-
-                        }
-                    );
-
-
-                headerPopular.classList.add(
-                    "active"
+                setHeaderActive(
+                    sort === "popular"
+                        ? 1
+                        : 0
                 );
 
             }
