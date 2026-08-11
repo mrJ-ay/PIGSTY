@@ -1,26 +1,34 @@
 @echo off
-title PIGSTY
-
-echo ========================================
-echo          PIGSTY Starting...
-echo ========================================
-echo.
+chcp 65001 > nul
 
 cd /d "%~dp0"
 
-echo [1/2] Starting Backend...
-start "PIGSTY Backend" cmd /k "cd backend && ..\backend.venv\Scripts\python.exe -m uvicorn main:app --reload --host 127.0.0.1 --port 8000"
+echo.
+echo ==============================
+echo        PIGSTY GIT PUSH
+echo ==============================
+echo.
 
-timeout /t 2 /nobreak >nul
-
-echo [2/2] Starting Frontend...
-start "PIGSTY Frontend" cmd /k "cd frontend && python -m http.server 5500"
-
-timeout /t 2 /nobreak >nul
-
-start http://127.0.0.1:5500
+git add .
 
 echo.
-echo PIGSTY is running!
+echo [1/3] 변경사항 추가 완료
 echo.
+
+set /p MSG="커밋 메시지 입력 (엔터=Update): "
+
+if "%MSG%"=="" set MSG=Update
+
+git commit -m "%MSG%"
+
+echo.
+echo [2/3] 커밋 완료
+echo.
+
+git push
+
+echo.
+echo [3/3] PUSH 완료
+echo.
+
 pause
