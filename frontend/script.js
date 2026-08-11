@@ -656,7 +656,6 @@ function createYouTubePreview(
                 frameborder="0"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowfullscreen
-                loading="lazy"
             ></iframe>
 
         </div>
@@ -667,23 +666,48 @@ function createYouTubePreview(
 
 
 // =========================================================
-// Create Post HTML
+// Post HTML
 // =========================================================
 
 function createPostHTML(
     post
 ) {
 
-    const tags =
-        post.tags
-            ? post.tags
-                .split(",")
-                .map(
-                    tag =>
-                        tag.trim()
-                )
-                .filter(Boolean)
-            : [];
+    const id =
+        post.id;
+
+
+    const title =
+        escapeHtml(
+            post.title
+        );
+
+
+    const content =
+        escapeHtml(
+            post.content
+        );
+
+
+    const author =
+        escapeHtml(
+            post.author ||
+            "익명"
+        );
+
+
+    const likes =
+        Number(
+            post.likes || 0
+        );
+
+
+    const comments =
+        Number(
+            post.comments_count ||
+            post.comment_count ||
+            0
+        );
 
 
     const youtubePreview =
@@ -692,108 +716,92 @@ function createPostHTML(
         );
 
 
-    const adminButtons =
-        currentUser &&
-        Number(
-            currentUser.is_admin
-        ) === 1
-
-        ? `
-
-            <button
-                class="delete-btn"
-                data-id="${post.id}"
-                type="button"
-            >
-                삭제
-            </button>
-
-        `
-
-        : "";
-
-
     return `
 
         <article
             class="post-card"
-            data-post-id="${post.id}"
+            data-id="${id}"
         >
 
-            <div class="post-top">
+            <div class="post-header">
 
-                <span class="post-author">
-                    ${escapeHtml(
-                        post.author
-                    )}
-                </span>
+                <div>
 
-                <span class="post-date">
-                    ${formatDate(
-                        post.created_at
-                    )}
-                </span>
+                    <h2 class="post-title">
+                        ${title}
+                    </h2>
+
+                    <div class="post-meta">
+
+                        <span>
+                            ${author}
+                        </span>
+
+                        <span>
+                            ${formatDate(
+                                post.created_at
+                            )}
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                ${
+                    currentUser &&
+                    (
+                        currentUser.username ===
+                        post.author ||
+                        Number(
+                            currentUser.is_admin
+                        ) === 1
+                    )
+                    ?
+                    `
+                        <button
+                            class="delete-btn"
+                            data-id="${id}"
+                            type="button"
+                        >
+                            삭제
+                        </button>
+                    `
+                    :
+                    ""
+                }
 
             </div>
 
 
-            <h2 class="post-title">
-                ${escapeHtml(
-                    post.title
-                )}
-            </h2>
+            <div class="post-content">
+
+                <p>
+                    ${content.replace(
+                        /\n/g,
+                        "<br>"
+                    )}
+                </p>
+
+                ${youtubePreview}
+
+            </div>
 
 
-            <p class="post-content">
-                ${escapeHtml(
-                    post.content
-                )}
-            </p>
-
-
-            ${youtubePreview}
-
-
-            ${
-                tags.length
-
-                ? `
-
-                    <div class="post-tags">
-
-                        ${
-                            tags
-                                .map(
-                                    tag =>
-                                        `<span>
-                                            #${escapeHtml(
-                                                tag
-                                            )}
-                                        </span>`
-                                )
-                                .join("")
-                        }
-
-                    </div>
-
-                `
-
-                : ""
-            }
-
-
-            <div class="post-actions">
+            <div class="post-footer">
 
                 <button
                     class="like-btn"
-                    data-id="${post.id}"
+                    data-id="${id}"
                     type="button"
                 >
-                    ♥ ${post.likes || 0}
+                    ♡ ${likes}
                 </button>
 
 
-                ${adminButtons}
+                <span class="comment-count">
+                    💬 ${comments}
+                </span>
 
             </div>
 
@@ -810,9 +818,6 @@ function createPostHTML(
 
 function attachPostEvents() {
 
-
-    // 좋아요
-
     document
         .querySelectorAll(
             ".like-btn"
@@ -824,11 +829,24 @@ function attachPostEvents() {
                     "click",
                     async () => {
 
+                        if (!token) {
+
+                            alert(
+                                "로그인이 필요합니다."
+                            );
+
+                            openLoginModal();
+
+                            return;
+
+                        }
+
+
+                        const id =
+                            button.dataset.id;
+
+
                         try {
-
-                            const id =
-                                button.dataset.id;
-
 
                             const result =
                                 await apiFetch(
@@ -840,13 +858,46 @@ function attachPostEvents() {
                                 );
 
 
-                            button.textContent =
-                                `♥ ${result.likes}`;
+                            button.innerHTML =
+                                `♡ ${
+                                    result.likes ??
+                                    0
+                                }`;
 
 
-                        } catch (
-                            error
-                        ) {
+                            const post =
+                                allPosts.find(
+                                    item =>
+                                        String(
+                                            item.id
+                                        ) ===
+                                        String(id)
+                                );
+
+
+                            if (post) {
+
+                                post.likes =
+                                    result.likes ??
+                                    post.likes ??
+                                    0;
+
+                            }
+
+
+                            if (
+                                currentSort ===
+                                "popular"
+                            ) {
+
+                                renderPosts(
+                                    allPosts,
+                                    "popular"
+                                );
+
+                            }
+
+                        } catch (error) {
 
                             alert(
                                 error.message
@@ -860,8 +911,6 @@ function attachPostEvents() {
             }
         );
 
-
-    // 관리자 개별 삭제
 
     document
         .querySelectorAll(
@@ -880,7 +929,7 @@ function attachPostEvents() {
 
                         if (
                             !confirm(
-                                "이 게시글을 삭제하시겠습니까?"
+                                "정말 삭제하시겠습니까?"
                             )
                         ) {
 
@@ -901,13 +950,11 @@ function attachPostEvents() {
 
 
                             await loadPosts(
-                                getCurrentSort()
+                                currentSort
                             );
 
 
-                        } catch (
-                            error
-                        ) {
+                        } catch (error) {
 
                             alert(
                                 error.message
@@ -925,256 +972,20 @@ function attachPostEvents() {
 
 
 // =========================================================
-// Delete All Posts
-// =========================================================
-
-async function deleteAllPosts() {
-
-    if (
-        !currentUser ||
-        Number(
-            currentUser.is_admin
-        ) !== 1
-    ) {
-
-        alert(
-            "관리자만 사용할 수 있습니다."
-        );
-
-        return;
-
-    }
-
-
-    const first =
-        confirm(
-            "정말 모든 게시물을 삭제하시겠습니까?"
-        );
-
-
-    if (!first) return;
-
-
-    const second =
-        confirm(
-            "⚠️ 모든 게시물이 영구적으로 삭제됩니다.\n\n계속하시겠습니까?"
-        );
-
-
-    if (!second) return;
-
-
-    try {
-
-        await apiFetch(
-            "/api/admin/posts",
-            {
-                method:
-                    "DELETE"
-            }
-        );
-
-
-        alert(
-            "모든 게시물이 삭제되었습니다."
-        );
-
-
-        await loadPosts(
-            "latest"
-        );
-
-
-    } catch (
-        error
-    ) {
-
-        alert(
-            error.message
-        );
-
-    }
-
-}
-
-
-// =========================================================
-// Current Sort
-// =========================================================
-
-function getCurrentSort() {
-
-    const select =
-        document.getElementById(
-            "sortSelect"
-        );
-
-
-    if (
-        select &&
-        select.value === "popular"
-    ) {
-
-        return "popular";
-
-    }
-
-
-    return currentSort || "latest";
-
-}
-
-
-// =========================================================
-// Create Post
-// =========================================================
-
-async function createPost(
-    title,
-    content,
-    tags
-) {
-
-    if (!token) {
-
-        alert(
-            "로그인이 필요합니다."
-        );
-
-        return;
-
-    }
-
-
-    await apiFetch(
-        "/api/posts",
-        {
-            method: "POST",
-
-            body:
-                JSON.stringify({
-                    title,
-                    content,
-                    tags
-                })
-        }
-    );
-
-
-    closeModal();
-
-
-    await loadPosts(
-        "latest"
-    );
-
-
-    alert(
-        "게시물이 등록되었습니다!"
-    );
-
-}
-
-
-// =========================================================
 // Modal
-// =========================================================
-
-function openModal(
-    content
-) {
-
-    let modal =
-        document.getElementById(
-            "modal"
-        );
-
-
-    if (!modal) {
-
-        modal =
-            document.createElement(
-                "div"
-            );
-
-
-        modal.id =
-            "modal";
-
-
-        modal.className =
-            "modal";
-
-
-        document.body.appendChild(
-            modal
-        );
-
-    }
-
-
-    modal.innerHTML =
-        content;
-
-
-    modal.classList.add(
-        "active"
-    );
-
-
-    modal
-        .querySelector(
-            ".close"
-        )
-        ?.addEventListener(
-            "click",
-            closeModal
-        );
-
-
-    modal.addEventListener(
-        "click",
-        event => {
-
-            if (
-                event.target ===
-                modal
-            ) {
-
-                closeModal();
-
-            }
-
-        },
-        {
-            once: true
-        }
-    );
-
-}
-
-
-// =========================================================
-// Close Modal
 // =========================================================
 
 function closeModal() {
 
     const modal =
-        document.getElementById(
-            "modal"
+        document.querySelector(
+            ".modal"
         );
 
 
     if (modal) {
 
-        modal.classList.remove(
-            "active"
-        );
-
-
-        modal.innerHTML =
-            "";
+        modal.remove();
 
     }
 
@@ -1187,9 +998,22 @@ function closeModal() {
 
 function openLoginModal() {
 
-    openModal(`
+    closeModal();
 
-        <div class="modal-box">
+
+    const modal =
+        document.createElement(
+            "div"
+        );
+
+
+    modal.className =
+        "modal";
+
+
+    modal.innerHTML = `
+
+        <div class="modal-content">
 
             <button
                 class="close"
@@ -1223,7 +1047,6 @@ function openLoginModal() {
 
 
                 <button
-                    class="submit"
                     type="submit"
                 >
                     로그인
@@ -1233,22 +1056,47 @@ function openLoginModal() {
 
 
             <button
-                class="switch-auth"
                 id="registerSwitch"
                 type="button"
             >
-                계정이 없나요? 회원가입
+                회원가입
             </button>
-
-
-            <p
-                class="auth-message"
-                id="authMessage"
-            ></p>
 
         </div>
 
-    `);
+    `;
+
+
+    document.body.appendChild(
+        modal
+    );
+
+
+    modal
+        .querySelector(
+            ".close"
+        )
+        ?.addEventListener(
+            "click",
+            closeModal
+        );
+
+
+    modal.addEventListener(
+        "click",
+        event => {
+
+            if (
+                event.target ===
+                modal
+            ) {
+
+                closeModal();
+
+            }
+
+        }
+    );
 
 
     document
@@ -1263,19 +1111,15 @@ function openLoginModal() {
 
 
                 const username =
-                    document
-                        .getElementById(
-                            "loginUsername"
-                        )
-                        .value;
+                    document.getElementById(
+                        "loginUsername"
+                    ).value.trim();
 
 
                 const password =
-                    document
-                        .getElementById(
-                            "loginPassword"
-                        )
-                        .value;
+                    document.getElementById(
+                        "loginPassword"
+                    ).value;
 
 
                 try {
@@ -1285,16 +1129,11 @@ function openLoginModal() {
                         password
                     );
 
-                } catch (
-                    error
-                ) {
+                } catch (error) {
 
-                    document
-                        .getElementById(
-                            "authMessage"
-                        )
-                        .textContent =
-                        error.message;
+                    alert(
+                        error.message
+                    );
 
                 }
 
@@ -1320,9 +1159,18 @@ function openLoginModal() {
 
 function showRegisterForm() {
 
-    openModal(`
+    const modal =
+        document.querySelector(
+            ".modal"
+        );
 
-        <div class="modal-box">
+
+    if (!modal) return;
+
+
+    modal.innerHTML = `
+
+        <div class="modal-content">
 
             <button
                 class="close"
@@ -1356,7 +1204,6 @@ function showRegisterForm() {
 
 
                 <button
-                    class="submit"
                     type="submit"
                 >
                     회원가입
@@ -1366,22 +1213,25 @@ function showRegisterForm() {
 
 
             <button
-                class="switch-auth"
                 id="loginSwitch"
                 type="button"
             >
-                이미 계정이 있나요? 로그인
+                로그인으로 돌아가기
             </button>
-
-
-            <p
-                class="auth-message"
-                id="authMessage"
-            ></p>
 
         </div>
 
-    `);
+    `;
+
+
+    modal
+        .querySelector(
+            ".close"
+        )
+        ?.addEventListener(
+            "click",
+            closeModal
+        );
 
 
     document
@@ -1396,19 +1246,15 @@ function showRegisterForm() {
 
 
                 const username =
-                    document
-                        .getElementById(
-                            "registerUsername"
-                        )
-                        .value;
+                    document.getElementById(
+                        "registerUsername"
+                    ).value.trim();
 
 
                 const password =
-                    document
-                        .getElementById(
-                            "registerPassword"
-                        )
-                        .value;
+                    document.getElementById(
+                        "registerPassword"
+                    ).value;
 
 
                 try {
@@ -1418,16 +1264,11 @@ function showRegisterForm() {
                         password
                     );
 
-                } catch (
-                    error
-                ) {
+                } catch (error) {
 
-                    document
-                        .getElementById(
-                            "authMessage"
-                        )
-                        .textContent =
-                        error.message;
+                    alert(
+                        error.message
+                    );
 
                 }
 
@@ -1448,17 +1289,16 @@ function showRegisterForm() {
 
 
 // =========================================================
-// Write Modal
+// Write Post Modal
 // =========================================================
 
 function openWriteModal() {
 
-    if (!currentUser) {
+    if (!token) {
 
         alert(
             "로그인이 필요합니다."
         );
-
 
         openLoginModal();
 
@@ -1467,9 +1307,22 @@ function openWriteModal() {
     }
 
 
-    openModal(`
+    closeModal();
 
-        <div class="modal-box">
+
+    const modal =
+        document.createElement(
+            "div"
+        );
+
+
+    modal.className =
+        "modal";
+
+
+    modal.innerHTML = `
+
+        <div class="modal-content post-modal">
 
             <button
                 class="close"
@@ -1480,7 +1333,7 @@ function openWriteModal() {
 
 
             <h2>
-                게시물 작성
+                글쓰기
             </h2>
 
 
@@ -1490,13 +1343,15 @@ function openWriteModal() {
                     id="postTitle"
                     type="text"
                     placeholder="제목"
+                    maxlength="200"
                     required
                 >
 
 
                 <textarea
                     id="postContent"
-                    placeholder="내용을 작성하세요.&#10;&#10;YouTube 링크를 넣으면 자동으로 미리보기가 표시됩니다."
+                    placeholder="내용을 입력하세요..."
+                    rows="8"
                     required
                 ></textarea>
 
@@ -1504,12 +1359,11 @@ function openWriteModal() {
                 <input
                     id="postTags"
                     type="text"
-                    placeholder="태그 (쉼표로 구분)"
+                    placeholder="태그 (예: 일상, 취미, 사진)"
                 >
 
 
                 <button
-                    class="submit"
                     type="submit"
                 >
                     게시하기
@@ -1519,7 +1373,39 @@ function openWriteModal() {
 
         </div>
 
-    `);
+    `;
+
+
+    document.body.appendChild(
+        modal
+    );
+
+
+    modal
+        .querySelector(
+            ".close"
+        )
+        ?.addEventListener(
+            "click",
+            closeModal
+        );
+
+
+    modal.addEventListener(
+        "click",
+        event => {
+
+            if (
+                event.target ===
+                modal
+            ) {
+
+                closeModal();
+
+            }
+
+        }
+    );
 
 
     document
@@ -1534,40 +1420,77 @@ function openWriteModal() {
 
 
                 const title =
-                    document
-                        .getElementById(
-                            "postTitle"
-                        )
-                        .value;
+                    document.getElementById(
+                        "postTitle"
+                    ).value.trim();
 
 
                 const content =
-                    document
-                        .getElementById(
-                            "postContent"
-                        )
-                        .value;
+                    document.getElementById(
+                        "postContent"
+                    ).value.trim();
 
 
                 const tags =
-                    document
-                        .getElementById(
-                            "postTags"
-                        )
-                        .value;
+                    document.getElementById(
+                        "postTags"
+                    ).value.trim();
+
+
+                if (!title) {
+
+                    alert(
+                        "제목을 입력해주세요."
+                    );
+
+                    return;
+
+                }
+
+
+                if (!content) {
+
+                    alert(
+                        "내용을 입력해주세요."
+                    );
+
+                    return;
+
+                }
 
 
                 try {
 
-                    await createPost(
-                        title,
-                        content,
-                        tags
+                    await apiFetch(
+                        "/api/posts",
+                        {
+                            method:
+                                "POST",
+
+                            body:
+                                JSON.stringify({
+                                    title,
+                                    content,
+                                    tags
+                                })
+                        }
                     );
 
-                } catch (
-                    error
-                ) {
+
+                    closeModal();
+
+
+                    await loadPosts(
+                        "latest"
+                    );
+
+
+                    alert(
+                        "게시물이 등록되었습니다."
+                    );
+
+
+                } catch (error) {
 
                     alert(
                         error.message
@@ -1577,6 +1500,81 @@ function openWriteModal() {
 
             }
         );
+
+}
+
+
+// =========================================================
+// Delete All Posts
+// =========================================================
+
+async function deleteAllPosts() {
+
+    if (!currentUser) {
+
+        alert(
+            "로그인이 필요합니다."
+        );
+
+        return;
+
+    }
+
+
+    if (
+        Number(
+            currentUser.is_admin
+        ) !== 1
+    ) {
+
+        alert(
+            "관리자만 사용할 수 있습니다."
+        );
+
+        return;
+
+    }
+
+
+    if (
+        !confirm(
+            "모든 게시물을 삭제하시겠습니까?"
+        )
+    ) {
+
+        return;
+
+    }
+
+
+    try {
+
+        await apiFetch(
+            "/api/posts/all",
+            {
+                method:
+                    "DELETE"
+            }
+        );
+
+
+        await loadPosts(
+            currentSort
+        );
+
+
+        alert(
+            "전체 게시물이 삭제되었습니다."
+        );
+
+
+    } catch (error) {
+
+        alert(
+            error.message
+        );
+
+    }
 
 }
 
@@ -2000,6 +1998,75 @@ document.addEventListener(
                         );
 
                 }
+
+            }
+        );
+
+
+        // =====================================================
+        // 상단 메뉴 - 인기
+        // =====================================================
+
+        const headerPopular =
+            document.querySelector(
+                "nav a:nth-child(2)"
+            );
+
+
+        headerPopular?.addEventListener(
+            "click",
+            async event => {
+
+                event.preventDefault();
+
+
+                await loadPosts(
+                    "popular"
+                );
+
+
+                tabs.forEach(
+                    btn => {
+
+                        btn.classList.remove(
+                            "selected"
+                        );
+
+                    }
+                );
+
+
+                tabs[1]?.classList.add(
+                    "selected"
+                );
+
+
+                if (sortSelect) {
+
+                    sortSelect.value =
+                        "popular";
+
+                }
+
+
+                document
+                    .querySelectorAll(
+                        "nav a"
+                    )
+                    .forEach(
+                        link => {
+
+                            link.classList.remove(
+                                "active"
+                            );
+
+                        }
+                    );
+
+
+                headerPopular.classList.add(
+                    "active"
+                );
 
             }
         );
