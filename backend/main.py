@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
@@ -20,19 +20,23 @@ from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from passlib.context import CryptContext
 
 import jwt
+import os
+import secrets
+import httpx
 
 
 # =========================================================
 # 설정
 # =========================================================
 
-SECRET_KEY = "pigsty-dev-secret-key-change-this"
+SECRET_KEY = os.getenv("PIGSTY_SECRET_KEY", "pigsty-dev-secret-key-change-this")
 
 ALGORITHM = "HS256"
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
 
 DATABASE_URL = "sqlite:///./pigsty.db"
+ONEID_API_URL = os.getenv("ONEID_API_URL", "https://oneid-icvq.onrender.com").rstrip("/")
 
 
 # =========================================================
@@ -96,6 +100,13 @@ class User(Base):
         default=0,
         nullable=False
     )
+
+
+class OneIDLink(Base):
+    __tablename__ = "oneid_links"
+    id = Column(Integer, primary_key=True, index=True)
+    oneid_user_id = Column(String(64), unique=True, nullable=False, index=True)
+    user_id = Column(Integer, unique=True, nullable=False, index=True)
 
 
 class Post(Base):
@@ -167,6 +178,8 @@ app.add_middleware(
     allow_origins=[
         "http://127.0.0.1:5500",
         "http://localhost:5500",
+        "http://127.0.0.1:5502",
+        "http://localhost:5502",
         "https://pigsty.onrender.com",
     ],
 
@@ -226,6 +239,7 @@ def create_access_token(
 
     payload = {
         "sub": username,
+        "mode": "oneid",
         "exp": expire,
     }
 
@@ -250,6 +264,9 @@ def get_current_user(
             SECRET_KEY,
             algorithms=[ALGORITHM]
         )
+
+        if payload.get("mode") != "oneid":
+            raise HTTPException(status_code=401, detail="ONEID로 다시 로그인해 주세요.")
 
         username = payload.get("sub")
 
@@ -296,22 +313,43 @@ def get_current_user(
 # =========================================================
 
 def get_admin_user(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    oneid_authorization: str | None = Header(default=None, alias="X-ONEID-Authorization"),
 ):
-
-    if current_user.is_admin != 1:
-
-        raise HTTPException(
-            status_code=403,
-            detail="관리자만 사용할 수 있습니다."
-        )
-
-    return current_user
+    link = db.query(OneIDLink).filter(OneIDLink.user_id == current_user.id).first()
+    if link:
+        oneid_user = verify_oneid_access_token(oneid_authorization)
+        if str(oneid_user.get("id")) != link.oneid_user_id or not oneid_user.get("is_admin"):
+            raise HTTPException(status_code=403, detail="ONEID 관리자 권한이 필요합니다.")
+        return current_user
+    raise HTTPException(status_code=403, detail="ONEID에 연결된 계정에 관리자 권한이 필요합니다.")
 
 
 # =========================================================
 # Schemas
 # =========================================================
+
+class OneIDCompleteRequest(BaseModel):
+    legacy_username: str | None = None
+    legacy_password: str | None = None
+    create_new: bool = False
+
+
+def verify_oneid_access_token(authorization: str | None) -> dict:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="ONEID 로그인이 필요합니다.")
+    if not ONEID_API_URL.startswith("https://") and not ONEID_API_URL.startswith(("http://127.0.0.1", "http://localhost", "http://[::1]")):
+        raise HTTPException(status_code=500, detail="ONEID_API_URL은 HTTPS 주소여야 합니다.")
+    try:
+        response = httpx.get(f"{ONEID_API_URL}/api/auth/me", headers={"Authorization": authorization}, timeout=5, follow_redirects=False)
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=503, detail="ONEID 계정을 확인할 수 없습니다.") from exc
+    if response.is_redirect:
+        raise HTTPException(status_code=502, detail="ONEID API가 예상하지 않은 리디렉션을 반환했습니다.")
+    if response.status_code != 200:
+        raise HTTPException(status_code=401, detail="ONEID 로그인이 만료되었습니다.")
+    return response.json()
 
 class RegisterRequest(BaseModel):
 
@@ -355,6 +393,7 @@ def register(
     request: RegisterRequest,
     db: Session = Depends(get_db)
 ):
+    raise HTTPException(status_code=410, detail="ONEID 로그인으로 통합되었습니다.")
 
     username = request.username.strip()
 
@@ -423,6 +462,7 @@ def login(
     request: LoginRequest,
     db: Session = Depends(get_db)
 ):
+    raise HTTPException(status_code=410, detail="ONEID 로그인으로 통합되었습니다.")
 
     user = db.query(User).filter(
         User.username == request.username
@@ -463,6 +503,47 @@ def login(
 # Auth - Me
 # =========================================================
 
+@app.post("/api/auth/oneid/complete")
+def complete_oneid_login(
+    request: OneIDCompleteRequest,
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+):
+    oneid_user = verify_oneid_access_token(authorization)
+    oneid_user_id = str(oneid_user.get("id") or "")
+    nickname = str(oneid_user.get("nickname") or "").strip()
+    if not oneid_user_id or not nickname:
+        raise HTTPException(status_code=400, detail="ONEID 계정 정보를 확인할 수 없습니다.")
+    link = db.query(OneIDLink).filter(OneIDLink.oneid_user_id == oneid_user_id).first()
+    if link:
+        user = db.query(User).filter(User.id == link.user_id).first()
+        if not user:
+            raise HTTPException(status_code=409, detail="연결된 PIGSTY 계정을 찾을 수 없습니다.")
+    elif request.legacy_username and request.legacy_password:
+        user = db.query(User).filter(User.username == request.legacy_username.strip()).first()
+        if not user or not verify_password(request.legacy_password, user.password_hash):
+            raise HTTPException(status_code=401, detail="기존 PIGSTY 아이디 또는 비밀번호가 올바르지 않습니다.")
+        owner = db.query(User).filter(User.username == nickname, User.id != user.id).first()
+        if owner:
+            raise HTTPException(status_code=409, detail="ONEID 닉네임이 다른 PIGSTY 계정과 겹쳐 연결할 수 없습니다.")
+        old_username = user.username
+        user.username = nickname
+        db.query(Post).filter(Post.author == old_username).update({Post.author: nickname}, synchronize_session=False)
+        db.add(OneIDLink(oneid_user_id=oneid_user_id, user_id=user.id))
+    elif request.create_new:
+        if db.query(User).filter(User.username == nickname).first():
+            raise HTTPException(status_code=409, detail="ONEID 닉네임이 이미 PIGSTY에서 사용 중입니다. 기존 계정을 연결해 주세요.")
+        user = User(username=nickname, password_hash=hash_password(secrets.token_urlsafe(48)), is_admin=0)
+        db.add(user)
+        db.flush()
+        db.add(OneIDLink(oneid_user_id=oneid_user_id, user_id=user.id))
+    else:
+        raise HTTPException(status_code=409, detail="ONEID_ACCOUNT_CHOICE_REQUIRED")
+    user.is_admin = 1 if oneid_user.get("is_admin") else 0
+    db.commit()
+    db.refresh(user)
+    return {"access_token": create_access_token(user.username), "token_type": "bearer", "user": {"id": user.id, "username": user.username, "is_admin": user.is_admin}}
+
 @app.get(
     "/api/auth/me"
 )
@@ -488,6 +569,7 @@ def make_admin(
     username: str,
     db: Session = Depends(get_db)
 ):
+    raise HTTPException(status_code=410, detail="전체 관리자 권한은 ONEID에서 관리합니다.")
 
     user = db.query(User).filter(
         User.username == username

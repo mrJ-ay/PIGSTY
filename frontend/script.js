@@ -1,4 +1,9 @@
 const API = "https://pigsty-backend.onrender.com";
+const ONEID_API_URL = window.ONEID_API_URL || "http://127.0.0.1:8000";
+const ONEID_CLIENT_ID = window.ONEID_CLIENT_ID || "pigsty";
+const ONEID_VERIFIER_KEY = "pigsty_oneid_verifier";
+const ONEID_STATE_KEY = "pigsty_oneid_state";
+const ONEID_PENDING_KEY = "pigsty_oneid_pending";
 
 let token = localStorage.getItem("pigsty_token");
 let currentUser = null;
@@ -42,6 +47,9 @@ async function apiFetch(url, options = {}) {
         "Content-Type": "application/json",
         ...(options.headers || {})
     };
+
+    const oneidAdminToken = sessionStorage.getItem("oneid_admin_access_token");
+    if (oneidAdminToken) headers["X-ONEID-Authorization"] = `Bearer ${oneidAdminToken}`;
 
     if (token) {
         headers["Authorization"] =
@@ -200,6 +208,9 @@ function logout() {
     localStorage.removeItem(
         "pigsty_token"
     );
+
+    sessionStorage.removeItem("oneid_admin_access_token");
+    sessionStorage.removeItem(ONEID_PENDING_KEY);
 
     updateAuthUI();
     updateAdminUI();
@@ -999,125 +1010,106 @@ function closeModal() {
 // =========================================================
 
 function openLoginModal() {
-
     openModal(`
-
         <div class="modal-box">
-
-            <button
-                class="close"
-                type="button"
-            >
-                ×
-            </button>
-
-
-            <h2>
-                로그인
-            </h2>
-
-
-            <form id="loginForm">
-
-                <input
-                    id="loginUsername"
-                    type="text"
-                    placeholder="아이디"
-                    required
-                >
-
-                <input
-                    id="loginPassword"
-                    type="password"
-                    placeholder="비밀번호"
-                    required
-                >
-
-                <button
-                    class="submit"
-                    type="submit"
-                >
-                    로그인
-                </button>
-
-            </form>
-
-
-            <button
-                class="switch-auth"
-                id="registerSwitch"
-                type="button"
-            >
-                계정이 없나요? 회원가입
-            </button>
-
-
-            <p
-                class="auth-message"
-                id="authMessage"
-            ></p>
-
+            <button class="close" type="button">×</button>
+            <h2>ONEID 로그인</h2>
+            <p>ONEID 공통 계정으로 PIGSTY에 로그인합니다.</p>
+            <button class="submit" type="button" onclick="beginOneIDLogin()">ONEID로 로그인</button>
+            <section id="oneidMigrationPanel" hidden>
+                <hr><h3>기존 PIGSTY 계정 연결</h3>
+                <p>기존 게시글을 이어 쓰려면 예전 아이디와 비밀번호를 한 번 입력하세요.</p>
+                <input id="legacyUsername" type="text" placeholder="기존 아이디" autocomplete="username">
+                <input id="legacyPassword" type="password" placeholder="기존 비밀번호" autocomplete="current-password">
+                <button class="submit" type="button" onclick="linkLegacyAccount()">기존 계정 연결</button>
+                <button class="switch-auth" type="button" onclick="createOneIDSiteAccount()">새 PIGSTY 계정으로 시작</button>
+            </section>
+            <p class="auth-message" id="authMessage" role="status" aria-live="polite"></p>
         </div>
-
     `);
-
-
-    document
-        .getElementById(
-            "loginForm"
-        )
-        ?.addEventListener(
-            "submit",
-            async event => {
-
-                event.preventDefault();
-
-                const username =
-                    document
-                        .getElementById(
-                            "loginUsername"
-                        )
-                        .value;
-
-                const password =
-                    document
-                        .getElementById(
-                            "loginPassword"
-                        )
-                        .value;
-
-                try {
-
-                    await login(
-                        username,
-                        password
-                    );
-
-                } catch (error) {
-
-                    document
-                        .getElementById(
-                            "authMessage"
-                        )
-                        .textContent =
-                        error.message;
-                }
-            }
-        );
-
-
-    document
-        .getElementById(
-            "registerSwitch"
-        )
-        ?.addEventListener(
-            "click",
-            showRegisterForm
-        );
 }
 
+function base64Url(bytes) {
+    return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
 
-// =========================================================
+async function beginOneIDLogin() {
+    const verifier = base64Url(crypto.getRandomValues(new Uint8Array(32)));
+    const state = base64Url(crypto.getRandomValues(new Uint8Array(24)));
+    const challenge = base64Url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
+    const redirectUri = `${location.origin}${location.pathname}`;
+    sessionStorage.setItem(ONEID_VERIFIER_KEY, verifier);
+    sessionStorage.setItem(ONEID_STATE_KEY, state);
+    const query = new URLSearchParams({ client_id: ONEID_CLIENT_ID, redirect_uri: redirectUri, code_challenge: challenge, state });
+    location.assign(`${ONEID_API_URL}/login.html?${query}`);
+}
+
+function showOneIDMigration(message) {
+    const panel = document.getElementById("oneidMigrationPanel");
+    if (panel) panel.hidden = false;
+    const status = document.getElementById("authMessage");
+    if (status) status.textContent = message || "기존 계정을 연결하거나 새 계정으로 시작할 수 있습니다.";
+}
+
+async function finishOneIDChoice(choice) {
+    const oneidToken = sessionStorage.getItem(ONEID_PENDING_KEY);
+    if (!oneidToken) return showOneIDMigration("ONEID 로그인이 만료됐습니다. 다시 로그인해 주세요.");
+    const body = choice === "new" ? { create_new: true } : {
+        legacy_username: document.getElementById("legacyUsername").value.trim(),
+        legacy_password: document.getElementById("legacyPassword").value,
+    };
+    try {
+        const response = await fetch(`${API}/api/auth/oneid/complete`, {
+            method: "POST", headers: { Authorization: `Bearer ${oneidToken}`, "Content-Type": "application/json" }, body: JSON.stringify(body),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || "PIGSTY 계정을 연결하지 못했습니다.");
+        token = result.access_token;
+        localStorage.setItem("pigsty_token", token);
+        sessionStorage.removeItem(ONEID_PENDING_KEY);
+        sessionStorage.setItem("oneid_admin_access_token", oneidToken);
+        await loadUser(); closeModal(); await loadPosts("latest");
+    } catch (error) {
+        const status = document.getElementById("authMessage");
+        if (status) status.textContent = error.message;
+    }
+}
+
+function linkLegacyAccount() { return finishOneIDChoice("legacy"); }
+function createOneIDSiteAccount() { return finishOneIDChoice("new"); }
+
+async function handleOneIDCallback() {
+    const params = new URLSearchParams(location.search);
+    const code = params.get("code");
+    if (!code) return;
+    const state = params.get("state");
+    const expectedState = sessionStorage.getItem(ONEID_STATE_KEY);
+    const verifier = sessionStorage.getItem(ONEID_VERIFIER_KEY);
+    history.replaceState(null, "", `${location.pathname}${location.hash}`);
+    sessionStorage.removeItem(ONEID_STATE_KEY); sessionStorage.removeItem(ONEID_VERIFIER_KEY);
+    if (!state || state !== expectedState || !verifier) { openLoginModal(); return showOneIDMigration("로그인 연결을 확인하지 못했습니다. 다시 로그인해 주세요."); }
+    const redirectUri = `${location.origin}${location.pathname}`;
+    const response = await fetch(`${ONEID_API_URL}/api/oauth/token`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ client_id: ONEID_CLIENT_ID, redirect_uri: redirectUri, code, code_verifier: verifier }),
+    });
+    const session = await response.json();
+    if (!response.ok || !session.access_token) { openLoginModal(); return showOneIDMigration(session.detail || "ONEID 로그인을 완료하지 못했습니다."); }
+    sessionStorage.setItem(ONEID_PENDING_KEY, session.access_token);
+    sessionStorage.setItem("oneid_admin_access_token", session.access_token);
+    const complete = await fetch(`${API}/api/auth/oneid/complete`, {
+        method: "POST", headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" }, body: "{}",
+    });
+    const result = await complete.json();
+    if (!complete.ok) {
+        openLoginModal();
+        if (result.detail === "ONEID_ACCOUNT_CHOICE_REQUIRED") return showOneIDMigration();
+        return showOneIDMigration(result.detail || "PIGSTY 로그인을 완료하지 못했습니다.");
+    }
+    token = result.access_token; localStorage.setItem("pigsty_token", token);
+    sessionStorage.removeItem(ONEID_PENDING_KEY);
+    await loadUser(); await loadPosts("latest");
+}
 // Register Modal
 // =========================================================
 
@@ -1948,6 +1940,7 @@ document.addEventListener(
     "DOMContentLoaded",
     async () => {
 
+        try { await handleOneIDCallback(); } catch (error) { openLoginModal(); showOneIDMigration(error?.message || "ONEID 연결 중 오류가 발생했습니다."); }
         await loadUser();
 
         await loadPosts(
