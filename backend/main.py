@@ -13,6 +13,7 @@ from sqlalchemy import (
     String,
     Text,
     DateTime,
+    text,
 )
 
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
@@ -157,6 +158,16 @@ class Post(Base):
 Base.metadata.create_all(
     bind=engine
 )
+with engine.begin() as conn:
+    try:
+        conn.execute(text("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0"))
+    except Exception:
+        pass
+    try:
+        conn.execute(text("ALTER TABLE users ADD COLUMN is_banned INTEGER NOT NULL DEFAULT 0"))
+    except Exception:
+        pass
+
 
 
 # =========================================================
@@ -505,7 +516,7 @@ def login(
 
 @app.post("/api/auth/oneid/complete")
 def complete_oneid_login(
-    request: OneIDCompleteRequest,
+    request: OneIDCompleteRequest = OneIDCompleteRequest(),
     authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ):
@@ -514,31 +525,44 @@ def complete_oneid_login(
     nickname = str(oneid_user.get("nickname") or "").strip()
     if not oneid_user_id or not nickname:
         raise HTTPException(status_code=400, detail="ONEID 계정 정보를 확인할 수 없습니다.")
+
     link = db.query(OneIDLink).filter(OneIDLink.oneid_user_id == oneid_user_id).first()
+    user = None
     if link:
         user = db.query(User).filter(User.id == link.user_id).first()
-        if not user:
-            raise HTTPException(status_code=409, detail="연결된 PIGSTY 계정을 찾을 수 없습니다.")
-    elif request.legacy_username and request.legacy_password:
+
+    # 기존 계정 명시적 연결 요청인 경우
+    if not user and request.legacy_username and request.legacy_password:
         user = db.query(User).filter(User.username == request.legacy_username.strip()).first()
         if not user or not verify_password(request.legacy_password, user.password_hash):
             raise HTTPException(status_code=401, detail="기존 PIGSTY 아이디 또는 비밀번호가 올바르지 않습니다.")
-        owner = db.query(User).filter(User.username == nickname, User.id != user.id).first()
-        if owner:
-            raise HTTPException(status_code=409, detail="ONEID 닉네임이 다른 PIGSTY 계정과 겹쳐 연결할 수 없습니다.")
         old_username = user.username
         user.username = nickname
         db.query(Post).filter(Post.author == old_username).update({Post.author: nickname}, synchronize_session=False)
         db.add(OneIDLink(oneid_user_id=oneid_user_id, user_id=user.id))
-    elif request.create_new:
-        if db.query(User).filter(User.username == nickname).first():
-            raise HTTPException(status_code=409, detail="ONEID 닉네임이 이미 PIGSTY에서 사용 중입니다. 기존 계정을 연결해 주세요.")
-        user = User(username=nickname, password_hash=hash_password(secrets.token_urlsafe(48)), is_admin=0)
-        db.add(user)
-        db.flush()
-        db.add(OneIDLink(oneid_user_id=oneid_user_id, user_id=user.id))
-    else:
-        raise HTTPException(status_code=409, detail="ONEID_ACCOUNT_CHOICE_REQUIRED")
+
+    # 아직 연결되지 않은 경우: FAKEPRESS처럼 자동 매핑 또는 자동 생성 (원클릭 SSO)
+    if not user:
+        existing_user = db.query(User).filter(User.username == nickname).first()
+        if existing_user and not db.query(OneIDLink).filter(OneIDLink.user_id == existing_user.id).first():
+            user = existing_user
+            db.add(OneIDLink(oneid_user_id=oneid_user_id, user_id=user.id))
+        else:
+            candidate = nickname[:30]
+            while db.query(User).filter(User.username == candidate).first():
+                suffix = "_" + secrets.token_hex(3)
+                candidate = nickname[:30 - len(suffix)] + suffix
+
+            user = User(
+                username=candidate,
+                password_hash=hash_password(secrets.token_urlsafe(48)),
+                is_admin=1 if oneid_user.get("is_admin") else 0,
+                is_banned=0,
+            )
+            db.add(user)
+            db.flush()
+            db.add(OneIDLink(oneid_user_id=oneid_user_id, user_id=user.id))
+
     user.is_admin = 1 if oneid_user.get("is_admin") else 0
     db.commit()
     db.refresh(user)

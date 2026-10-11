@@ -1106,7 +1106,7 @@ async function handleOneIDCallback() {
         if (result.detail === "ONEID_ACCOUNT_CHOICE_REQUIRED") return showOneIDMigration();
         return showOneIDMigration(result.detail || "PIGSTY 로그인을 완료하지 못했습니다.");
     }
-    token = result.access_token; localStorage.setItem("pigsty_token", token);
+    token = result.access_token; localStorage.setItem("pigsty_token", token); closeModal();
     sessionStorage.removeItem(ONEID_PENDING_KEY);
     await loadUser(); await loadPosts("latest");
 }
