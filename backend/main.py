@@ -102,6 +102,12 @@ class User(Base):
         nullable=False
     )
 
+    is_banned = Column(
+        Integer,
+        default=0,
+        nullable=False
+    )
+
 
 class OneIDLink(Base):
     __tablename__ = "oneid_links"
