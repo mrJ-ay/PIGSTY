@@ -36,7 +36,9 @@ ALGORITHM = "HS256"
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
 
-DATABASE_URL = "sqlite:///./pigsty.db"
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./pigsty.db")
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 ONEID_API_URL = os.getenv("ONEID_API_URL", "https://oneid-icvq.onrender.com").rstrip("/")
 
 
@@ -44,12 +46,16 @@ ONEID_API_URL = os.getenv("ONEID_API_URL", "https://oneid-icvq.onrender.com").rs
 # Database
 # =========================================================
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={
-        "check_same_thread": False
-    },
-)
+if DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False},
+    )
+else:
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+    )
 
 SessionLocal = sessionmaker(
     autocommit=False,
@@ -164,13 +170,13 @@ class Post(Base):
 Base.metadata.create_all(
     bind=engine
 )
-with engine.begin() as conn:
+for _stmt in (
+    "ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE users ADD COLUMN is_banned INTEGER NOT NULL DEFAULT 0",
+):
     try:
-        conn.execute(text("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0"))
-    except Exception:
-        pass
-    try:
-        conn.execute(text("ALTER TABLE users ADD COLUMN is_banned INTEGER NOT NULL DEFAULT 0"))
+        with engine.begin() as conn:
+            conn.execute(text(_stmt))
     except Exception:
         pass
 
