@@ -24,6 +24,7 @@ import jwt
 import os
 import secrets
 import httpx
+from censor import inspect_content
 
 
 # =========================================================
@@ -157,6 +158,22 @@ class Post(Base):
         default=0
     )
 
+    status = Column(
+        String(20),
+        default="active",
+        nullable=False
+    )
+
+    censored_reason = Column(
+        String(200),
+        nullable=True
+    )
+
+    censored_at = Column(
+        DateTime,
+        nullable=True
+    )
+
     created_at = Column(
         DateTime,
         default=datetime.utcnow
@@ -173,6 +190,9 @@ Base.metadata.create_all(
 for _stmt in (
     "ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE users ADD COLUMN is_banned INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE posts ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'active'",
+    "ALTER TABLE posts ADD COLUMN censored_reason VARCHAR(200)",
+    "ALTER TABLE posts ADD COLUMN censored_at TIMESTAMP",
 ):
     try:
         with engine.begin() as conn:
@@ -642,10 +662,15 @@ def make_admin(
     "/api/posts"
 )
 def get_posts(
+    include_censored: int = 0,
     db: Session = Depends(get_db)
 ):
 
-    posts = db.query(Post).order_by(
+    query = db.query(Post)
+    if not include_censored:
+        query = query.filter(Post.status != "censored")
+
+    posts = query.order_by(
         Post.created_at.desc()
     ).all()
 
@@ -659,6 +684,12 @@ def get_posts(
             "tags": post.tags or "",
             "author": post.author,
             "likes": post.likes or 0,
+            "status": post.status or "active",
+            "censored_reason": post.censored_reason,
+            "censored_at":
+                post.censored_at.isoformat()
+                if post.censored_at
+                else None,
             "created_at":
                 post.created_at.isoformat()
                 if post.created_at
@@ -671,7 +702,7 @@ def get_posts(
 
 
 # =========================================================
-# Posts - Create
+# Posts - Create (with Real-time Censor Bot Auto-Inspection)
 # =========================================================
 
 @app.post(
@@ -706,21 +737,29 @@ def create_post(
         )
 
 
+    # 검열봇 실시간 감지 검사
+    violated, reason, matched_kw = inspect_content(title, content, tags)
+
+    now = datetime.utcnow()
+    initial_status = "censored" if violated else "active"
+    censored_reason_text = f"{reason} ({matched_kw})" if violated else None
+    censored_at_time = now if violated else None
+
     post = Post(
         title=title,
         content=content,
         tags=tags,
         author=current_user.username,
-        likes=0
+        likes=0,
+        status=initial_status,
+        censored_reason=censored_reason_text,
+        censored_at=censored_at_time,
+        created_at=now,
     )
 
-
     db.add(post)
-
     db.commit()
-
     db.refresh(post)
-
 
     return {
         "id": post.id,
@@ -729,6 +768,13 @@ def create_post(
         "tags": post.tags,
         "author": post.author,
         "likes": post.likes,
+        "status": post.status,
+        "censored": violated,
+        "censored_reason": censored_reason_text,
+        "censored_message": (
+            f"🤖 [피그스티 검열봇 알림] 게시물에서 '{censored_reason_text}'이(가) 감지되어 피드에서 자동 격리/삭제 처리되었습니다."
+            if violated else None
+        ),
         "created_at":
             post.created_at.isoformat()
     }
@@ -845,3 +891,39 @@ def delete_all_posts(
         "message": "모든 게시물이 삭제되었습니다.",
         "deleted_count": len(posts)
     }
+
+
+# =========================================================
+# Censor Bot - Quarantine Logs & Stats
+# =========================================================
+
+@app.get(
+    "/api/censor/logs"
+)
+def get_censor_logs(
+    db: Session = Depends(get_db)
+):
+    censored_posts = (
+        db.query(Post)
+        .filter(Post.status == "censored")
+        .order_by(Post.censored_at.desc())
+        .limit(50)
+        .all()
+    )
+
+    total_censored = db.query(Post).filter(Post.status == "censored").count()
+
+    return {
+        "total_censored": total_censored,
+        "bot_name": "피그스티 검열봇 (PIGSTY CENSOR BOT)",
+        "logs": [
+            {
+                "id": p.id,
+                "author": p.author,
+                "title": p.title,
+                "censored_reason": p.censored_reason,
+                "censored_at": p.censored_at.isoformat() if p.censored_at else None,
+            }
+            for p in censored_posts
+        ],
+    }

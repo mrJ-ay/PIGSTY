@@ -899,7 +899,7 @@ async function createPost(
         return;
     }
 
-    await apiFetch(
+    const result = await apiFetch(
         "/api/posts",
         {
             method: "POST",
@@ -920,10 +920,16 @@ async function createPost(
 
     setHeaderActive(0);
 
-    alert(
-        "게시물이 등록되었습니다!"
-    );
+    if (result && result.censored) {
+        showCensorAlert(result.censored_message || "🤖 [검열봇 알림] 부적절한 표현이 감지되어 게시글이 자동 격리/삭제되었습니다.");
+    } else {
+        alert(
+            "게시물이 등록되었습니다!"
+        );
+    }
+    loadCensorStats();
 }
+
 
 
 // =========================================================
@@ -2263,6 +2269,67 @@ document.addEventListener(
 
 
         updateAdminUI();
+        loadCensorStats();
 
     }
 );
+
+
+// =========================================================
+// Censor Bot UI & Handlers
+// =========================================================
+
+function showCensorAlert(message) {
+    const existing = document.getElementById("censorAlertOverlay");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.id = "censorAlertOverlay";
+    overlay.className = "censor-overlay";
+    overlay.innerHTML = `
+        <div class="censor-alert-card">
+            <div class="censor-icon-wrap">
+                <span class="censor-icon">🤖🚫</span>
+            </div>
+            <h3 class="censor-alert-title">피그스티 검열봇 경고</h3>
+            <p class="censor-alert-desc">${escapeHtml(message)}</p>
+            <div class="censor-alert-notice">
+                <span>※ 감지된 사유와 함께 작성된 글은 실시간 격리되었으며, 공개 피드에 노출되지 않습니다.</span>
+            </div>
+            <button type="button" class="censor-close-btn" onclick="document.getElementById('censorAlertOverlay').remove()">확인</button>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+}
+
+async function loadCensorStats() {
+    try {
+        const res = await apiFetch("/api/censor/logs");
+        if (!res) return;
+
+        const badge = document.getElementById("censorBotBadge");
+        if (badge) {
+            badge.textContent = `격리 ${res.total_censored || 0}건`;
+        }
+
+        const logList = document.getElementById("censorLogList");
+        if (logList) {
+            if (!res.logs || res.logs.length === 0) {
+                logList.innerHTML = `<li class="censor-empty">현재 격리된 게시물이 없습니다. (청정 구역)</li>`;
+            } else {
+                logList.innerHTML = res.logs.slice(0, 5).map(log => `
+                    <li class="censor-log-item">
+                        <div class="censor-log-top">
+                            <span class="censor-log-user">@${escapeHtml(log.author)}</span>
+                            <span class="censor-log-badge">격리됨</span>
+                        </div>
+                        <div class="censor-log-reason">사유: ${escapeHtml(log.censored_reason || "부적절한 표현")}</div>
+                        <div class="censor-log-title">"${escapeHtml(log.title)}"</div>
+                    </li>
+                `).join("");
+            }
+        }
+    } catch (err) {
+        console.warn("Failed to load censor stats", err);
+    }
+}
