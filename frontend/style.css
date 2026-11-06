@@ -1164,15 +1164,15 @@ aside {
     font-weight: 600;
     padding: 3px 8px;
     border-radius: 999px;
-    background: #fee2e2;
-    color: #b91c1c;
+    background: #dcfce7;
+    color: #15803d;
 }
 
 .censor-bot-desc {
     font-size: 12px;
     color: #64748b;
     line-height: 1.5;
-    margin-bottom: 12px;
+    margin-bottom: 0;
 }
 
 .censor-logs-container {

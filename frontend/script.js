@@ -2304,32 +2304,12 @@ function showCensorAlert(message) {
 
 async function loadCensorStats() {
     try {
-        const res = await apiFetch("/api/censor/logs");
-        if (!res) return;
-
         const badge = document.getElementById("censorBotBadge");
         if (badge) {
-            badge.textContent = `격리 ${res.total_censored || 0}건`;
-        }
-
-        const logList = document.getElementById("censorLogList");
-        if (logList) {
-            if (!res.logs || res.logs.length === 0) {
-                logList.innerHTML = `<li class="censor-empty">현재 격리된 게시물이 없습니다. (청정 구역)</li>`;
-            } else {
-                logList.innerHTML = res.logs.slice(0, 5).map(log => `
-                    <li class="censor-log-item">
-                        <div class="censor-log-top">
-                            <span class="censor-log-user">@${escapeHtml(log.author)}</span>
-                            <span class="censor-log-badge">격리됨</span>
-                        </div>
-                        <div class="censor-log-reason">사유: ${escapeHtml(log.censored_reason || "부적절한 표현")}</div>
-                        <div class="censor-log-title">"${escapeHtml(log.title)}"</div>
-                    </li>
-                `).join("");
-            }
+            badge.textContent = "작동 중";
         }
     } catch (err) {
-        console.warn("Failed to load censor stats", err);
+        console.warn("Failed to update censor stats", err);
     }
-}
+}
+
