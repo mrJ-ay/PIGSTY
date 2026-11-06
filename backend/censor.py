@@ -71,7 +71,17 @@ SEXUAL_KEYWORDS = [
     "섹트", "일탈계", "오프만남", "라인녀", "텔레녀",
 ]
 
-# 자주 우회되는 욕설 정규식 패턴 (숫자, 특수기호, 띄어쓰기 침투 대응)
+# 3. 정치 드립 / 정치인 비하 / 정쟁 키워드
+POLITICAL_KEYWORDS = [
+    "노무현", "노알라", "운지", "MC무현", "mc무현", "봉하마을", "노통",
+    "이순실", "최순실", "순실", "박근혜", "근혜", "닭근혜", "문재앙", "문죄인", "문재인",
+    "윤석열", "윤두창", "두창", "쥴리", "이재명", "찢재명", "개딸", "대깨문",
+    "좌빨", "빨갱이", "수꼴", "수구꼴통", "토착왜구", "일베충", "전두환", "땅크",
+    "김대중", "슨상님", "홍어", "통구이", "간철수", "안철수",
+]
+
+# 자주 우회되는 욕설/정치 정규식 패턴 (숫자, 특수기호, 띄어쓰기 침투 대응)
+
 # 예: 시1발, 시@발, ㅆ|발, ㅅㅣㅂㅏㄹ, ㅂ.ㅅ, ㅂㅕㅇ신
 FUZZY_PATTERNS = [
     (re.compile(r"[시씨싀ㅅㅆ][\d\s\W_]*[발빨벌뻘바]"), "욕설/비속어 (시발 계열)"),
@@ -83,9 +93,16 @@ FUZZY_PATTERNS = [
     (re.compile(r"[섹섺][\d\s\W_]*[스쓰]"), "선정성 (음란 표현)"),
     (re.compile(r"[조쪼][\d\s\W_]*[건건][\d\s\W_]*[만맨][\d\s\W_]*[남남]"), "불법만남/선정성"),
     (re.compile(r"[몸몲][\d\s\W_]*[캠턤]"), "불법/선정성 (몸캠)"),
+    (re.compile(r"[노로][\d\s\W_]*[무뮤][\d\s\W_]*[현횬형]"), "정치 드립/특정 정치인 언급"),
+    (re.compile(r"[이리][\d\s\W_]*[순선][\d\s\W_]*[실슬]"), "정치 드립/정치인 비하"),
+    (re.compile(r"[최쵀][\d\s\W_]*[순선][\d\s\W_]*[실슬]"), "정치 드립/정치인 비하"),
+    (re.compile(r"[박바][\d\s\W_]*[근그][\d\s\W_]*[혜헤]"), "정치 드립/특정 정치인 언급"),
+    (re.compile(r"[문무][\d\s\W_]*[재제][\d\s\W_]*[앙인]"), "정치 드립/정치인 비하"),
+    (re.compile(r"[윤유][\d\s\W_]*[석서][\d\s\W_]*[열열]"), "정치 드립/특정 정치인 언급"),
+    (re.compile(r"[이리][\d\s\W_]*[재제][\d\s\W_]*[명맹]"), "정치 드립/특정 정치인 언급"),
 ]
 
-# 자모 분해 후 매칭할 패턴 (예: ㅂㅕㅇ신, ㅅㅣㅂㅏㄹ)
+# 자모 분해 후 매칭할 패턴 (예: ㅂㅕㅇ신, ㅅㅣㅂㅏㄹ, ㄴㅁㅎ)
 JAMO_PATTERNS = [
     (re.compile(r"ㅅ[\s\W_]*ㅣ[\s\W_]*ㅂ[\s\W_]*ㅏ[\s\W_]*ㄹ"), "욕설 (ㅅㅣㅂㅏㄹ)"),
     (re.compile(r"ㅆ[\s\W_]*ㅣ[\s\W_]*ㅂ[\s\W_]*ㅏ[\s\W_]*ㄹ"), "욕설 (ㅆㅣㅂㅏㄹ)"),
@@ -93,10 +110,14 @@ JAMO_PATTERNS = [
     (re.compile(r"ㄱ[\s\W_]*ㅐ[\s\W_]*ㅅ[\s\W_]*ㅐ[\s\W_]*ㄲ[\s\W_]*ㅣ"), "욕설 (ㄱㅐㅅㅐㄲㅣ)"),
     (re.compile(r"ㅈ[\s\W_]*ㅣ[\s\W_]*ㄹ[\s\W_]*ㅏ[\s\W_]*ㄹ"), "욕설 (ㅈㅣㄹㅏㄹ)"),
     (re.compile(r"ㅅ[\s\W_]*ㅔ[\s\W_]*ㄱ[\s\W_]*ㅅ[\s\W_]*ㅡ"), "선정성 (ㅅㅔㄱㅅㅡ)"),
+    (re.compile(r"ㄴ[\s\W_]*ㅗ[\s\W_]*ㅁ[\s\W_]*ㅜ[\s\W_]*ㅎ[\s\W_]*ㅕ[\s\W_]*ㄴ"), "정치 드립 (ㄴㅗㅁㅜㅎㅕㄴ)"),
+    (re.compile(r"ㅇ[\s\W_]*ㅣ[\s\W_]*ㅅ[\s\W_]*ㅜ[\s\W_]*ㄴ[\s\W_]*ㅅ[\s\W_]*ㅣ[\s\W_]*ㄹ"), "정치 드립 (ㅇㅣㅅㅜㄴㅅㅣㄹ)"),
     (re.compile(r"ㅅ[\s\W_]*ㅂ"), "초성 욕설 (ㅅㅂ)"),
     (re.compile(r"ㅆ[\s\W_]*ㅂ"), "초성 욕설 (ㅆㅂ)"),
     (re.compile(r"ㅂ[\s\W_]*ㅅ"), "초성 비하 (ㅂㅅ)"),
     (re.compile(r"ㅈ[\s\W_]*ㄹ"), "초성 욕설 (ㅈㄹ)"),
+    (re.compile(r"ㄴ[\s\W_]*ㅁ[\s\W_]*ㅎ"), "초성 정치 드립 (ㄴㅁㅎ)"),
+    (re.compile(r"ㅇ[\s\W_]*ㅅ[\s\W_]*ㅅ"), "초성 정치 드립 (ㅇㅅㅅ)"),
 ]
 
 
@@ -114,17 +135,23 @@ def inspect_content(title: str, content: str, tags: str = "") -> Tuple[bool, Opt
     cleaned = clean_text(full_text)
     jamo_text = decompose_hangul(full_text)
 
-    # 1. 선정성 키워드 검사 (정확 일치 및 공백 제거 일치)
+    # 1. 정치 드립 / 정쟁 / 정치인 비하 검사
+    for kw in POLITICAL_KEYWORDS:
+        if kw in full_text or kw in cleaned:
+            return True, "정치 드립 및 특정 정치인 언급 금지", kw
+
+    # 2. 선정성 키워드 검사 (정확 일치 및 공백 제거 일치)
     for kw in SEXUAL_KEYWORDS:
         if kw in full_text or kw in cleaned:
             return True, "음란/선정적 표현 감지", kw
 
-    # 2. 욕설/비하 키워드 검사 (단, '존맛' 등 긍정적 합성어 예외 고려)
+    # 3. 욕설/비하 키워드 검사 (단, '존맛' 등 긍정적 합성어 예외 고려)
     for kw in PROFANITY_KEYWORDS:
         if kw == "존맛":
             continue
         if kw in full_text or kw in cleaned:
             return True, "욕설 및 비하 표현 감지", kw
+
 
     # 3. 우회 정규식 패턴 검사 (특수문자/숫자 침투)
     for pattern, reason in FUZZY_PATTERNS:
