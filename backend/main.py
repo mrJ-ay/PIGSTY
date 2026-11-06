@@ -181,7 +181,7 @@ class Post(Base):
 
 
 # =========================================================
-# Database 생성
+# Database 생성 및 기존 게시물 소급 검열 (Backfill)
 # =========================================================
 
 Base.metadata.create_all(
@@ -199,6 +199,33 @@ for _stmt in (
             conn.execute(text(_stmt))
     except Exception:
         pass
+
+
+def retro_censor_posts(db: Session) -> int:
+    """기존에 등록되었던 모든 활성 게시물을 전수 검사하여 소급 격리합니다."""
+    active_posts = db.query(Post).filter(Post.status != "censored").all()
+    count = 0
+    now = datetime.utcnow()
+    for p in active_posts:
+        violated, reason, kw = inspect_content(p.title or "", p.content or "", p.tags or "")
+        if violated:
+            p.status = "censored"
+            p.censored_reason = f"{reason} ({kw})"
+            p.censored_at = p.censored_at or now
+            count += 1
+    if count > 0:
+        db.commit()
+    return count
+
+
+# 서버 부팅 시 즉시 1회 소급 검열 실행
+try:
+    with SessionLocal() as _db:
+        _censored_cnt = retro_censor_posts(_db)
+        if _censored_cnt > 0:
+            print(f"[CENSOR BOT] 기존 게시물 {_censored_cnt}건 소급 격리 완료")
+except Exception as _e:
+    print(f"[CENSOR BOT] 소급 검열 초기화 오류: {_e}")
 
 
 
@@ -232,6 +259,7 @@ app.add_middleware(
 
     allow_headers=["*"],
 )
+
 
 
 # =========================================================
@@ -655,7 +683,7 @@ def make_admin(
 
 
 # =========================================================
-# Posts - Get
+# Posts - Get (with Dynamic Retro-Censorship)
 # =========================================================
 
 @app.get(
@@ -666,6 +694,9 @@ def get_posts(
     db: Session = Depends(get_db)
 ):
 
+    # 최신 금칙어 기준으로 기존 글 소급 격리 처리
+    retro_censor_posts(db)
+
     query = db.query(Post)
     if not include_censored:
         query = query.filter(Post.status != "censored")
@@ -673,6 +704,7 @@ def get_posts(
     posts = query.order_by(
         Post.created_at.desc()
     ).all()
+
 
 
     return [
@@ -903,6 +935,9 @@ def delete_all_posts(
 def get_censor_logs(
     db: Session = Depends(get_db)
 ):
+    # 최신 금칙어로 즉시 소급 검열 동기화
+    retro_censor_posts(db)
+
     censored_posts = (
         db.query(Post)
         .filter(Post.status == "censored")
