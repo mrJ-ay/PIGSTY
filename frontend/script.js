@@ -10,6 +10,9 @@ let currentUser = null;
 let allPosts = [];
 let currentSort = "latest";
 let searchInput = null;
+let galleries = [];
+let currentGallery = "all";
+let conceptOnly = false;
 
 
 // =========================================================
@@ -330,9 +333,17 @@ async function loadPosts(
 
     try {
 
+        const params = new URLSearchParams();
+        if (currentGallery && currentGallery !== "all") {
+            params.set("gallery", currentGallery);
+        }
+        if (conceptOnly) {
+            params.set("concept", "1");
+        }
+        const qs = params.toString();
         const posts =
             await apiFetch(
-                "/api/posts"
+                qs ? `/api/posts?${qs}` : "/api/posts"
             );
 
         if (!Array.isArray(posts)) {
@@ -596,6 +607,8 @@ function createPostHTML(
             <div class="post-top">
 
                 <span class="post-author">
+                    <span class="post-gallery-tag" data-gallery="${escapeHtml(post.gallery_slug || "free")}">[${escapeHtml(post.gallery_name || "자유")} 갤]</span>
+                    ${post.is_concept ? `<span class="post-concept-badge">★ 개념글</span>` : ""}
                     ${escapeHtml(
                         post.author
                     )}
@@ -605,12 +618,13 @@ function createPostHTML(
                     ${formatDate(
                         post.created_at
                     )}
+                    <span class="post-meta-stats">조회 ${post.views || 0} · 댓글 ${post.comment_count || 0}</span>
                 </span>
 
             </div>
 
 
-            <h2 class="post-title">
+            <h2 class="post-title clickable" data-id="${post.id}">
                 ${escapeHtml(
                     post.title
                 )}
@@ -680,6 +694,22 @@ function createPostHTML(
 // =========================================================
 
 function attachPostEvents() {
+
+    document
+        .querySelectorAll(".post-title.clickable")
+        .forEach(el => {
+            el.addEventListener("click", () => {
+                openPostDetailModal(Number(el.dataset.id));
+            });
+        });
+
+    document
+        .querySelectorAll(".post-gallery-tag")
+        .forEach(el => {
+            el.addEventListener("click", () => {
+                selectGallery(el.dataset.gallery || "free");
+            });
+        });
 
     document
         .querySelectorAll(
@@ -887,7 +917,8 @@ function getCurrentSort() {
 async function createPost(
     title,
     content,
-    tags
+    tags,
+    gallerySlug = "free"
 ) {
 
     if (!token) {
@@ -907,7 +938,8 @@ async function createPost(
             body: JSON.stringify({
                 title,
                 content,
-                tags
+                tags,
+                gallery_slug: gallerySlug
             })
         }
     );
@@ -917,6 +949,7 @@ async function createPost(
     await loadPosts(
         "latest"
     );
+    loadGalleries();
 
     setHeaderActive(0);
 
@@ -1254,6 +1287,11 @@ function openWriteModal() {
         return;
     }
 
+    const defaultGallery = currentGallery && currentGallery !== "all" ? currentGallery : "free";
+    const galleryOptions = (galleries.length ? galleries : [{ slug: "free", name: "자유", category: "메이저" }])
+        .map(g => `<option value="${escapeHtml(g.slug)}" ${g.slug === defaultGallery ? "selected" : ""}>${escapeHtml(g.name)} 갤러리 (${escapeHtml(g.category || "메이저")})</option>`)
+        .join("");
+
     openModal(`
 
         <div class="modal-box">
@@ -1272,6 +1310,10 @@ function openWriteModal() {
 
 
             <form id="postForm">
+
+                <select id="postGallery" class="modal-select">
+                    ${galleryOptions}
+                </select>
 
                 <input
                     id="postTitle"
@@ -1319,6 +1361,11 @@ function openWriteModal() {
 
                 event.preventDefault();
 
+                const gallerySlug =
+                    document
+                        .getElementById("postGallery")
+                        ?.value || "free";
+
                 const title =
                     document
                         .getElementById(
@@ -1345,7 +1392,8 @@ function openWriteModal() {
                     await createPost(
                         title,
                         content,
-                        tags
+                        tags,
+                        gallerySlug
                     );
 
                 } catch (error) {
@@ -2268,8 +2316,21 @@ document.addEventListener(
             );
 
 
+        document
+            .getElementById("createGalleryBtn")
+            ?.addEventListener("click", openCreateGalleryModal);
+
+        document
+            .getElementById("modeAllBtn")
+            ?.addEventListener("click", () => setConceptMode(false));
+
+        document
+            .getElementById("modeConceptBtn")
+            ?.addEventListener("click", () => setConceptMode(true));
+
         updateAdminUI();
         loadCensorStats();
+        loadGalleries();
 
     }
 );
@@ -2310,6 +2371,222 @@ async function loadCensorStats() {
         }
     } catch (err) {
         console.warn("Failed to update censor stats", err);
+    }
+}
+
+// =========================================================
+// DCInside-style Gallery & Post Detail / Comments
+// =========================================================
+
+async function loadGalleries() {
+    try {
+        const data = await apiFetch("/api/galleries");
+        if (Array.isArray(data)) {
+            galleries = data;
+            renderGalleryBar();
+            updateGalleryHeader();
+        }
+    } catch (err) {
+        console.warn("Failed to load galleries", err);
+    }
+}
+
+function renderGalleryBar() {
+    const listEl = document.getElementById("galleryBarList");
+    if (!listEl) return;
+
+    const totalCount = galleries.reduce((sum, g) => sum + (g.post_count || 0), 0);
+    const pills = [
+        `<button class="gallery-pill ${currentGallery === "all" ? "active" : ""}" data-slug="all" type="button">
+            <span>전체글</span>
+            <span class="gallery-pill-count">${totalCount}</span>
+        </button>`,
+        ...galleries.map(g => `
+            <button class="gallery-pill ${currentGallery === g.slug ? "active" : ""}" data-slug="${escapeHtml(g.slug)}" type="button">
+                ${g.category === "마이너" ? `<span class="gallery-pill-minor">마이너</span>` : ""}
+                <span>${escapeHtml(g.name)}</span>
+                <span class="gallery-pill-count">${g.post_count || 0}</span>
+            </button>
+        `)
+    ];
+
+    listEl.innerHTML = pills.join("");
+    listEl.querySelectorAll(".gallery-pill").forEach(btn => {
+        btn.addEventListener("click", () => {
+            selectGallery(btn.dataset.slug || "all");
+        });
+    });
+}
+
+function updateGalleryHeader() {
+    const titleEl = document.getElementById("currentGalleryTitle");
+    const badgeEl = document.getElementById("currentGalleryBadge");
+    const descEl = document.getElementById("currentGalleryDesc");
+    if (!titleEl || !badgeEl || !descEl) return;
+
+    if (currentGallery === "all") {
+        titleEl.textContent = "전체 갤러리";
+        badgeEl.textContent = "통합";
+        badgeEl.className = "gallery-type-badge";
+        descEl.textContent = "모든 갤러리의 최신 글을 한눈에 볼 수 있습니다.";
+        return;
+    }
+
+    const g = galleries.find(item => item.slug === currentGallery);
+    if (!g) return;
+    titleEl.textContent = `${g.name} 갤러리`;
+    badgeEl.textContent = g.category || "메이저";
+    badgeEl.className = g.category === "마이너" ? "gallery-type-badge minor" : "gallery-type-badge";
+    descEl.textContent = g.description || `${g.name} 주제로 이야기를 나누는 갤러리입니다.`;
+}
+
+async function selectGallery(slug) {
+    currentGallery = slug || "all";
+    renderGalleryBar();
+    updateGalleryHeader();
+    await loadPosts(currentSort);
+}
+
+async function setConceptMode(enabled) {
+    conceptOnly = Boolean(enabled);
+    document.getElementById("modeAllBtn")?.classList.toggle("active", !conceptOnly);
+    document.getElementById("modeConceptBtn")?.classList.toggle("active", conceptOnly);
+    await loadPosts(currentSort);
+}
+
+function openCreateGalleryModal() {
+    if (!currentUser) {
+        alert("갤러리 개설은 로그인이 필요합니다.");
+        openLoginModal();
+        return;
+    }
+
+    openModal(`
+        <div class="modal-box">
+            <button class="close" type="button">×</button>
+            <h2>마이너 갤러리 개설</h2>
+            <form id="createGalleryForm">
+                <input id="galleryNameInput" type="text" placeholder="갤러리 이름 (예: 고양이, 영화, 자취)" maxlength="30" required>
+                <input id="gallerySlugInput" type="text" placeholder="영문 주소 슬러그 (선택, 예: cat)" maxlength="40">
+                <textarea id="galleryDescInput" placeholder="갤러리 소개를 입력하세요." maxlength="200"></textarea>
+                <button class="submit" type="submit">갤러리 개설하기</button>
+            </form>
+        </div>
+    `);
+
+    document.getElementById("createGalleryForm")?.addEventListener("submit", async event => {
+        event.preventDefault();
+        const name = document.getElementById("galleryNameInput")?.value || "";
+        const slug = document.getElementById("gallerySlugInput")?.value || "";
+        const description = document.getElementById("galleryDescInput")?.value || "";
+
+        try {
+            const created = await apiFetch("/api/galleries", {
+                method: "POST",
+                body: JSON.stringify({ name, slug: slug || null, description })
+            });
+            closeModal();
+            await loadGalleries();
+            await selectGallery(created.slug);
+            alert(`${created.name} 갤러리가 개설되었습니다!`);
+        } catch (err) {
+            alert(err.message);
+        }
+    });
+}
+
+async function openPostDetailModal(postId) {
+    try {
+        const post = await apiFetch(`/api/posts/${postId}`);
+        const youtubePreview = createYouTubePreview(post.content);
+        const commentsHtml = (post.comments || []).length
+            ? post.comments.map(c => `
+                <div class="comment-item">
+                    <div class="comment-item-head">
+                        <strong>${escapeHtml(c.author)}</strong>
+                        <span>${formatDate(c.created_at)}</span>
+                    </div>
+                    <div class="comment-item-body">${escapeHtml(c.content)}</div>
+                </div>
+            `).join("")
+            : `<p style="font-size:13px; color:#94a3b8; margin-bottom:10px;">아직 댓글이 없습니다. 첫 댓글을 남겨보세요!</p>`;
+
+        openModal(`
+            <div class="modal-box detail-modal-box">
+                <button class="close" type="button">×</button>
+                <div style="margin-bottom:8px;">
+                    <span class="post-gallery-tag">[${escapeHtml(post.gallery_name || "자유")} 갤]</span>
+                    ${post.is_concept ? `<span class="post-concept-badge">★ 개념글</span>` : ""}
+                </div>
+                <h2 style="margin-bottom:10px;">${escapeHtml(post.title)}</h2>
+                <div class="detail-meta">
+                    <strong>${escapeHtml(post.author)}</strong>
+                    <span>·</span>
+                    <span>${formatDate(post.created_at)}</span>
+                    <span>·</span>
+                    <span>조회 ${post.views || 0}</span>
+                    <span>·</span>
+                    <span>추천 <span id="detailLikesCount">${post.likes || 0}</span></span>
+                </div>
+                <div class="detail-content">${escapeHtml(post.content)}</div>
+                ${youtubePreview}
+                <div class="detail-actions">
+                    <button id="detailLikeBtn" class="like-btn" type="button">♥ 추천 ${post.likes || 0}</button>
+                </div>
+                <div class="comments-section">
+                    <h3>댓글 (${(post.comments || []).length})</h3>
+                    <div id="detailCommentList" class="comment-list">${commentsHtml}</div>
+                    <form id="detailCommentForm" class="comment-form">
+                        <input id="detailCommentInput" type="text" placeholder="댓글을 입력하세요..." maxlength="1000" required>
+                        <button type="submit">등록</button>
+                    </form>
+                </div>
+            </div>
+        `);
+
+        document.getElementById("detailLikeBtn")?.addEventListener("click", async () => {
+            if (!token) {
+                alert("로그인이 필요합니다.");
+                openLoginModal();
+                return;
+            }
+            try {
+                const res = await apiFetch(`/api/posts/${postId}/like`, { method: "POST" });
+                const btn = document.getElementById("detailLikeBtn");
+                const cnt = document.getElementById("detailLikesCount");
+                if (btn) btn.textContent = `♥ 추천 ${res.likes}`;
+                if (cnt) cnt.textContent = res.likes;
+                loadPosts(currentSort);
+            } catch (err) {
+                alert(err.message);
+            }
+        });
+
+        document.getElementById("detailCommentForm")?.addEventListener("submit", async event => {
+            event.preventDefault();
+            if (!token) {
+                alert("댓글 작성은 로그인이 필요합니다.");
+                openLoginModal();
+                return;
+            }
+            const input = document.getElementById("detailCommentInput");
+            const content = input?.value?.trim() || "";
+            if (!content) return;
+            try {
+                await apiFetch(`/api/posts/${postId}/comments`, {
+                    method: "POST",
+                    body: JSON.stringify({ content })
+                });
+                await openPostDetailModal(postId);
+                loadPosts(currentSort);
+            } catch (err) {
+                alert(err.message);
+            }
+        });
+
+        loadPosts(currentSort);
+    } catch (err) {
+        alert(err.message || "게시물을 불러오지 못했습니다.");
     }
 }
 

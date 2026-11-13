@@ -136,12 +136,42 @@
          Content
     ========================== -->
 
+    <!-- =========================
+         DCInside-style Gallery Bar
+    ========================== -->
+    <section class="gallery-bar" id="galleryBar">
+        <div class="gallery-bar-top">
+            <div class="gallery-bar-title">
+                <span class="dc-badge">GALLERY</span>
+                <strong>피그스티 갤러리</strong>
+            </div>
+            <button id="createGalleryBtn" class="create-gallery-btn" type="button">+ 마이너 갤러리 개설</button>
+        </div>
+        <div id="galleryBarList" class="gallery-pill-list">
+            <button class="gallery-pill active" data-slug="all" type="button">전체글</button>
+        </div>
+    </section>
+
     <div class="layout">
 
 
         <!-- Feed -->
 
         <section class="feed">
+
+            <div id="galleryHeaderBar" class="gallery-header-bar">
+                <div class="gallery-header-info">
+                    <div class="gallery-title-row">
+                        <h2 id="currentGalleryTitle">전체 갤러리</h2>
+                        <span id="currentGalleryBadge" class="gallery-type-badge">통합</span>
+                    </div>
+                    <p id="currentGalleryDesc">모든 갤러리의 최신 글을 한눈에 볼 수 있습니다.</p>
+                </div>
+                <div class="gallery-mode-btns">
+                    <button id="modeAllBtn" class="mode-btn active" type="button">전체글</button>
+                    <button id="modeConceptBtn" class="mode-btn concept" type="button">★ 개념글</button>
+                </div>
+            </div>
 
 
             <div class="feed-header">

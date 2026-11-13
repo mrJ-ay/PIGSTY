@@ -13,6 +13,8 @@ from sqlalchemy import (
     String,
     Text,
     DateTime,
+    ForeignKey,
+    func,
     text,
 )
 
@@ -22,6 +24,7 @@ from passlib.context import CryptContext
 
 import jwt
 import os
+import re
 import secrets
 import httpx
 from censor import inspect_content
@@ -174,10 +177,47 @@ class Post(Base):
         nullable=True
     )
 
+    gallery_slug = Column(
+        String(60),
+        default="free",
+        nullable=False,
+        index=True
+    )
+
+    views = Column(
+        Integer,
+        default=0,
+        nullable=False
+    )
+
     created_at = Column(
         DateTime,
         default=datetime.utcnow
     )
+
+
+class Gallery(Base):
+
+    __tablename__ = "galleries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    slug = Column(String(60), unique=True, nullable=False, index=True)
+    name = Column(String(80), nullable=False)
+    description = Column(String(200), default="", nullable=False)
+    category = Column(String(40), default="메이저", nullable=False)
+    creator = Column(String(50), default="system", nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Comment(Base):
+
+    __tablename__ = "comments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    post_id = Column(Integer, ForeignKey("posts.id", ondelete="CASCADE"), nullable=False, index=True)
+    author = Column(String(50), nullable=False)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 # =========================================================
@@ -193,12 +233,42 @@ for _stmt in (
     "ALTER TABLE posts ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'active'",
     "ALTER TABLE posts ADD COLUMN censored_reason VARCHAR(200)",
     "ALTER TABLE posts ADD COLUMN censored_at TIMESTAMP",
+    "ALTER TABLE posts ADD COLUMN gallery_slug VARCHAR(60) NOT NULL DEFAULT 'free'",
+    "ALTER TABLE posts ADD COLUMN views INTEGER NOT NULL DEFAULT 0",
 ):
     try:
         with engine.begin() as conn:
             conn.execute(text(_stmt))
     except Exception:
         pass
+
+
+DEFAULT_GALLERIES = [
+    ("free", "자유", "아무 주제나 자유롭게 이야기하는 기본 갤러리", "메이저"),
+    ("humor", "유머", "웃긴 짤, 드립, 유머 이야기를 나누는 갤러리", "메이저"),
+    ("game", "게임", "PC, 콘솔, 모바일 등 각종 게임 이야기", "메이저"),
+    ("music", "음악", "플레이리스트, 밴드, 힙합, 인디 음악 공유", "메이저"),
+    ("dev", "IT/개발", "코딩, AI, 하드웨어, 기술 잡담 갤러리", "메이저"),
+    ("fashion", "패션", "코디, 신발, 스트릿, 빈티지 취향 공유", "메이저"),
+]
+
+
+def seed_default_galleries(db: Session) -> None:
+    existing = {g.slug for g in db.query(Gallery).all()}
+    added = False
+    for slug, name, desc, cat in DEFAULT_GALLERIES:
+        if slug not in existing:
+            db.add(Gallery(slug=slug, name=name, description=desc, category=cat, creator="system"))
+            added = True
+    if added:
+        db.commit()
+
+
+try:
+    with SessionLocal() as _db:
+        seed_default_galleries(_db)
+except Exception as _e:
+    print(f"[GALLERY SEED] 기본 갤러리 초기화 오류: {_e}")
 
 
 def retro_censor_posts(db: Session) -> int:
@@ -434,11 +504,27 @@ class LoginRequest(BaseModel):
     password: str
 
 
+CONCEPT_LIKE_THRESHOLD = 3
+
+
 class PostCreate(BaseModel):
 
     title: str
     content: str
     tags: str = ""
+    gallery_slug: str = "free"
+
+
+class GalleryCreate(BaseModel):
+
+    name: str
+    slug: str | None = None
+    description: str = ""
+
+
+class CommentCreate(BaseModel):
+
+    content: str
 
 
 # =========================================================
@@ -683,91 +769,268 @@ def make_admin(
 
 
 # =========================================================
+# Galleries (DCInside Style)
+# =========================================================
+
+def _gallery_map(db: Session) -> dict[str, str]:
+    return {g.slug: g.name for g in db.query(Gallery).all()}
+
+
+def _comment_counts(db: Session) -> dict[int, int]:
+    rows = db.query(Comment.post_id, func.count(Comment.id)).group_by(Comment.post_id).all()
+    return {post_id: cnt for post_id, cnt in rows}
+
+
+def _serialize_post(post: Post, g_map: dict[str, str], c_counts: dict[int, int]) -> dict:
+    slug = post.gallery_slug or "free"
+    likes = post.likes or 0
+    return {
+        "id": post.id,
+        "title": post.title,
+        "content": post.content,
+        "tags": post.tags or "",
+        "author": post.author,
+        "likes": likes,
+        "views": post.views or 0,
+        "comment_count": c_counts.get(post.id, 0),
+        "gallery_slug": slug,
+        "gallery_name": g_map.get(slug, slug),
+        "is_concept": likes >= CONCEPT_LIKE_THRESHOLD,
+        "status": post.status or "active",
+        "censored_reason": post.censored_reason,
+        "censored_at": post.censored_at.isoformat() if post.censored_at else None,
+        "created_at": post.created_at.isoformat() if post.created_at else None,
+    }
+
+
+@app.get("/api/galleries")
+def get_galleries(db: Session = Depends(get_db)):
+    seed_default_galleries(db)
+    galleries = db.query(Gallery).order_by(Gallery.id.asc()).all()
+
+    post_counts = dict(
+        db.query(Post.gallery_slug, func.count(Post.id))
+        .filter(Post.status != "censored")
+        .group_by(Post.gallery_slug)
+        .all()
+    )
+    concept_counts = dict(
+        db.query(Post.gallery_slug, func.count(Post.id))
+        .filter(Post.status != "censored", Post.likes >= CONCEPT_LIKE_THRESHOLD)
+        .group_by(Post.gallery_slug)
+        .all()
+    )
+
+    return [
+        {
+            "id": g.id,
+            "slug": g.slug,
+            "name": g.name,
+            "description": g.description,
+            "category": g.category,
+            "creator": g.creator,
+            "post_count": post_counts.get(g.slug, 0),
+            "concept_count": concept_counts.get(g.slug, 0),
+            "created_at": g.created_at.isoformat() if g.created_at else None,
+        }
+        for g in galleries
+    ]
+
+
+@app.post("/api/galleries")
+def create_gallery(
+    request: GalleryCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    name = request.name.strip()
+    if name.endswith("갤러리") and len(name) > 3:
+        name = name[:-3].strip()
+    if len(name) < 1 or len(name) > 30:
+        raise HTTPException(status_code=400, detail="갤러리 이름은 1~30자로 입력해주세요.")
+
+    description = (request.description or "").strip()[:200]
+    violated, reason, matched_kw = inspect_content(name, description, "")
+    if violated:
+        raise HTTPException(status_code=400, detail=f"부적절한 표현이 포함되어 개설할 수 없습니다: {reason} ({matched_kw})")
+
+    raw_slug = (request.slug or "").strip().lower()
+    raw_slug = re.sub(r"[^a-z0-9_-]+", "-", raw_slug).strip("-")
+    if not raw_slug:
+        ascii_only = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+        raw_slug = ascii_only or f"minor-{secrets.token_hex(3)}"
+
+    if raw_slug in ("all", "best", "concept") or db.query(Gallery).filter(Gallery.slug == raw_slug).first():
+        raw_slug = f"{raw_slug[:40]}-{secrets.token_hex(2)}"
+
+    if db.query(Gallery).filter(Gallery.name == name).first():
+        raise HTTPException(status_code=409, detail="이미 같은 이름의 갤러리가 존재합니다.")
+
+    gallery = Gallery(
+        slug=raw_slug[:60],
+        name=name,
+        description=description or f"{name} 주제로 이야기하는 마이너 갤러리",
+        category="마이너",
+        creator=current_user.username,
+        created_at=datetime.utcnow(),
+    )
+    db.add(gallery)
+    db.commit()
+    db.refresh(gallery)
+
+    return {
+        "id": gallery.id,
+        "slug": gallery.slug,
+        "name": gallery.name,
+        "description": gallery.description,
+        "category": gallery.category,
+        "creator": gallery.creator,
+        "post_count": 0,
+        "concept_count": 0,
+        "created_at": gallery.created_at.isoformat() if gallery.created_at else None,
+    }
+
+
+# =========================================================
 # Posts - Get (with Dynamic Retro-Censorship)
 # =========================================================
 
-@app.get(
-    "/api/posts"
-)
+@app.get("/api/posts")
 def get_posts(
     include_censored: int = 0,
+    gallery: str | None = None,
+    concept: int = 0,
+    q: str | None = None,
     db: Session = Depends(get_db)
 ):
-
     # 최신 금칙어 기준으로 기존 글 소급 격리 처리
     retro_censor_posts(db)
 
     query = db.query(Post)
     if not include_censored:
         query = query.filter(Post.status != "censored")
+    if gallery and gallery != "all":
+        query = query.filter(Post.gallery_slug == gallery)
+    if concept:
+        query = query.filter(Post.likes >= CONCEPT_LIKE_THRESHOLD)
 
-    posts = query.order_by(
-        Post.created_at.desc()
-    ).all()
+    posts = query.order_by(Post.created_at.desc()).all()
+
+    if q and q.strip():
+        needle = q.strip().lower()
+        posts = [
+            p for p in posts
+            if needle in (p.title or "").lower()
+            or needle in (p.content or "").lower()
+            or needle in (p.tags or "").lower()
+            or needle in (p.author or "").lower()
+        ]
+
+    g_map = _gallery_map(db)
+    c_counts = _comment_counts(db)
+    return [_serialize_post(post, g_map, c_counts) for post in posts]
 
 
+@app.get("/api/posts/{post_id}")
+def get_post_detail(
+    post_id: int,
+    db: Session = Depends(get_db),
+):
+    post = db.query(Post).filter(Post.id == post_id).first()
+    if not post or post.status == "censored":
+        raise HTTPException(status_code=404, detail="게시물을 찾을 수 없습니다.")
 
-    return [
+    post.views = (post.views or 0) + 1
+    db.commit()
+    db.refresh(post)
 
+    comments = (
+        db.query(Comment)
+        .filter(Comment.post_id == post_id)
+        .order_by(Comment.created_at.asc())
+        .all()
+    )
+    g_map = _gallery_map(db)
+    c_counts = {post.id: len(comments)}
+    data = _serialize_post(post, g_map, c_counts)
+    data["comments"] = [
         {
-            "id": post.id,
-            "title": post.title,
-            "content": post.content,
-            "tags": post.tags or "",
-            "author": post.author,
-            "likes": post.likes or 0,
-            "status": post.status or "active",
-            "censored_reason": post.censored_reason,
-            "censored_at":
-                post.censored_at.isoformat()
-                if post.censored_at
-                else None,
-            "created_at":
-                post.created_at.isoformat()
-                if post.created_at
-                else None,
+            "id": c.id,
+            "post_id": c.post_id,
+            "author": c.author,
+            "content": c.content,
+            "created_at": c.created_at.isoformat() if c.created_at else None,
         }
-
-        for post in posts
-
+        for c in comments
     ]
+    return data
+
+
+@app.post("/api/posts/{post_id}/comments")
+def create_comment(
+    post_id: int,
+    request: CommentCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    post = db.query(Post).filter(Post.id == post_id).first()
+    if not post or post.status == "censored":
+        raise HTTPException(status_code=404, detail="게시물을 찾을 수 없습니다.")
+
+    content = request.content.strip()
+    if not content:
+        raise HTTPException(status_code=400, detail="댓글 내용을 입력해주세요.")
+    if len(content) > 1000:
+        raise HTTPException(status_code=400, detail="댓글은 1000자 이하로 입력해주세요.")
+
+    violated, reason, matched_kw = inspect_content("", content, "")
+    if violated:
+        raise HTTPException(
+            status_code=400,
+            detail=f"🤖 [피그스티 검열봇] 댓글에서 '{reason} ({matched_kw})'이(가) 감지되어 등록이 차단되었습니다.",
+        )
+
+    comment = Comment(
+        post_id=post_id,
+        author=current_user.username,
+        content=content,
+        created_at=datetime.utcnow(),
+    )
+    db.add(comment)
+    db.commit()
+    db.refresh(comment)
+
+    return {
+        "id": comment.id,
+        "post_id": comment.post_id,
+        "author": comment.author,
+        "content": comment.content,
+        "created_at": comment.created_at.isoformat() if comment.created_at else None,
+    }
 
 
 # =========================================================
 # Posts - Create (with Real-time Censor Bot Auto-Inspection)
 # =========================================================
 
-@app.post(
-    "/api/posts"
-)
+@app.post("/api/posts")
 def create_post(
     request: PostCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-
     title = request.title.strip()
-
     content = request.content.strip()
-
     tags = request.tags.strip()
-
+    gallery_slug = (request.gallery_slug or "free").strip() or "free"
 
     if not title:
-
-        raise HTTPException(
-            status_code=400,
-            detail="제목을 입력해주세요."
-        )
-
-
+        raise HTTPException(status_code=400, detail="제목을 입력해주세요.")
     if not content:
+        raise HTTPException(status_code=400, detail="내용을 입력해주세요.")
 
-        raise HTTPException(
-            status_code=400,
-            detail="내용을 입력해주세요."
-        )
-
+    if not db.query(Gallery).filter(Gallery.slug == gallery_slug).first():
+        gallery_slug = "free"
 
     # 검열봇 실시간 감지 검사
     violated, reason, matched_kw = inspect_content(title, content, tags)
@@ -783,6 +1046,8 @@ def create_post(
         tags=tags,
         author=current_user.username,
         likes=0,
+        views=0,
+        gallery_slug=gallery_slug,
         status=initial_status,
         censored_reason=censored_reason_text,
         censored_at=censored_at_time,
@@ -793,23 +1058,14 @@ def create_post(
     db.commit()
     db.refresh(post)
 
-    return {
-        "id": post.id,
-        "title": post.title,
-        "content": post.content,
-        "tags": post.tags,
-        "author": post.author,
-        "likes": post.likes,
-        "status": post.status,
-        "censored": violated,
-        "censored_reason": censored_reason_text,
-        "censored_message": (
-            f"🤖 [피그스티 검열봇 알림] 게시물에서 '{censored_reason_text}'이(가) 감지되어 피드에서 자동 격리/삭제 처리되었습니다."
-            if violated else None
-        ),
-        "created_at":
-            post.created_at.isoformat()
-    }
+    g_map = _gallery_map(db)
+    result = _serialize_post(post, g_map, {post.id: 0})
+    result["censored"] = violated
+    result["censored_message"] = (
+        f"🤖 [피그스티 검열봇 알림] 게시물에서 '{censored_reason_text}'이(가) 감지되어 피드에서 자동 격리/삭제 처리되었습니다."
+        if violated else None
+    )
+    return result
 
 
 # =========================================================
