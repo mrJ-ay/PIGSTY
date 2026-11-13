@@ -40,7 +40,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./pigsty.db")
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-ONEID_API_URL = os.getenv("ONEID_API_URL", "https://oneid-icvq.onrender.com").rstrip("/")
+ONEID_API_URL = os.getenv("ONEID_API_URL", "https://oneid-ruddy.vercel.app").rstrip("/")
 
 
 # =========================================================
