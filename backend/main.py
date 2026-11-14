@@ -560,7 +560,7 @@ class LoginRequest(BaseModel):
     password: str
 
 
-CONCEPT_LIKE_THRESHOLD = 3
+CONCEPT_LIKE_THRESHOLD = 20
 
 
 class PostCreate(BaseModel):
