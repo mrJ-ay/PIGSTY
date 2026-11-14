@@ -2021,6 +2021,11 @@ document.addEventListener(
 
                 event.preventDefault();
 
+                currentGallery = "all";
+                conceptOnly = false;
+                updateGalleryHeader();
+                renderGalleryBar();
+
                 await loadPosts(
                     "latest"
                 );
@@ -2072,6 +2077,11 @@ document.addEventListener(
             async event => {
 
                 event.preventDefault();
+
+                currentGallery = "all";
+                conceptOnly = false;
+                updateGalleryHeader();
+                renderGalleryBar();
 
                 await loadPosts(
                     "popular"
@@ -2407,21 +2417,23 @@ function renderGalleryBar() {
 }
 
 function updateGalleryHeader() {
+    const headerBar = document.getElementById("galleryHeaderBar");
     const titleEl = document.getElementById("currentGalleryTitle");
     const badgeEl = document.getElementById("currentGalleryBadge");
     const descEl = document.getElementById("currentGalleryDesc");
-    if (!titleEl || !badgeEl || !descEl) return;
+    if (!headerBar || !titleEl || !badgeEl || !descEl) return;
 
     if (currentGallery === "all") {
-        titleEl.textContent = "전체 갤러리";
-        badgeEl.textContent = "통합";
-        badgeEl.className = "gallery-type-badge";
-        descEl.textContent = "모든 갤러리의 최신 글을 한눈에 볼 수 있습니다.";
+        headerBar.style.display = "none";
         return;
     }
 
     const g = galleries.find(item => item.slug === currentGallery);
-    if (!g) return;
+    if (!g) {
+        headerBar.style.display = "none";
+        return;
+    }
+    headerBar.style.display = "block";
     titleEl.textContent = `${g.name} 갤러리`;
     badgeEl.textContent = g.category || "메이저";
     badgeEl.className = g.category === "마이너" ? "gallery-type-badge minor" : "gallery-type-badge";
@@ -2617,6 +2629,9 @@ async function openPostDetailModal(postId) {
 async function openGalleryDirectoryPage() {
     const postsContainer = document.getElementById("posts");
     if (!postsContainer) return;
+
+    const headerBar = document.getElementById("galleryHeaderBar");
+    if (headerBar) headerBar.style.display = "none";
 
     const sortSelect = document.getElementById("sortSelect");
     if (sortSelect) sortSelect.disabled = true;
