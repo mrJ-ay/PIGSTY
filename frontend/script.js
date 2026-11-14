@@ -2259,6 +2259,16 @@ document.addEventListener(
             .getElementById("modeConceptBtn")
             ?.addEventListener("click", () => setConceptMode(true));
 
+        document
+            .getElementById("feedConceptBtn")
+            ?.addEventListener("click", () => setConceptMode(!conceptOnly));
+
+        document
+            .getElementById("feedGallerySelect")
+            ?.addEventListener("change", event => {
+                selectGallery(event.target.value || "all");
+            });
+
         updateAdminUI();
         loadCensorStats();
         loadGalleries();
@@ -2347,6 +2357,15 @@ function renderGalleryBar() {
             selectGallery(btn.dataset.slug || "all");
         });
     });
+
+    const selectEl = document.getElementById("feedGallerySelect");
+    if (selectEl) {
+        selectEl.innerHTML = [
+            `<option value="all">전체 갤러리 (${totalCount})</option>`,
+            ...galleries.map(g => `<option value="${escapeHtml(g.slug)}">${escapeHtml(g.name)} 갤 (${g.post_count || 0})</option>`)
+        ].join("");
+        selectEl.value = currentGallery || "all";
+    }
 }
 
 function updateGalleryHeader() {
@@ -2385,6 +2404,7 @@ async function setConceptMode(enabled) {
     conceptOnly = Boolean(enabled);
     document.getElementById("modeAllBtn")?.classList.toggle("active", !conceptOnly);
     document.getElementById("modeConceptBtn")?.classList.toggle("active", conceptOnly);
+    document.getElementById("feedConceptBtn")?.classList.toggle("active", conceptOnly);
     await loadPosts(currentSort);
 }
 
