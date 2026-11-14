@@ -103,7 +103,7 @@ FUZZY_PATTERNS = [
     (re.compile(r"[이리][\d\s\W_]*[재제][\d\s\W_]*[명맹]"), "정치 드립/특정 정치인 언급"),
 ]
 
-# 자모 분해 후 매칭할 패턴 (예: ㅂㅕㅇ신, ㅅㅣㅂㅏㄹ, ㄴㅁㅎ)
+# 자모 분해 후 매칭할 패턴 (예: ㅂㅕㅇ신, ㅅㅣㅂㅏㄹ)
 JAMO_PATTERNS = [
     (re.compile(r"ㅅ[\s\W_]*ㅣ[\s\W_]*ㅂ[\s\W_]*ㅏ[\s\W_]*ㄹ"), "욕설 (ㅅㅣㅂㅏㄹ)"),
     (re.compile(r"ㅆ[\s\W_]*ㅣ[\s\W_]*ㅂ[\s\W_]*ㅏ[\s\W_]*ㄹ"), "욕설 (ㅆㅣㅂㅏㄹ)"),
@@ -111,14 +111,18 @@ JAMO_PATTERNS = [
     (re.compile(r"ㄱ[\s\W_]*ㅐ[\s\W_]*ㅅ[\s\W_]*ㅐ[\s\W_]*ㄲ[\s\W_]*ㅣ"), "욕설 (ㄱㅐㅅㅐㄲㅣ)"),
     (re.compile(r"ㅈ[\s\W_]*ㅣ[\s\W_]*ㄹ[\s\W_]*ㅏ[\s\W_]*ㄹ"), "욕설 (ㅈㅣㄹㅏㄹ)"),
     (re.compile(r"ㄴ[\s\W_]*ㅡ[\s\W_]*ㄱ[\s\W_]*ㅡ[\s\W_]*ㅁ[\s\W_]*[ㅁㅃ][\s\W_]*ㅏ"), "패륜/비하 (ㄴㅡㄱㅡㅁㅁㅏ/ㅃㅏ)"),
-    (re.compile(r"ㄴ[\s\W_]*ㄱ[\s\W_]*[ㅁㅃ]"), "초성 패륜/비하 (ㄴㄱㅁ/ㅃ)"),
     (re.compile(r"ㅅ[\s\W_]*ㅔ[\s\W_]*ㄱ[\s\W_]*ㅅ[\s\W_]*ㅡ"), "선정성 (ㅅㅔㄱㅅㅡ)"),
     (re.compile(r"ㄴ[\s\W_]*ㅗ[\s\W_]*ㅁ[\s\W_]*ㅜ[\s\W_]*ㅎ[\s\W_]*ㅕ[\s\W_]*ㄴ"), "정치 드립 (ㄴㅗㅁㅜㅎㅕㄴ)"),
     (re.compile(r"ㅇ[\s\W_]*ㅣ[\s\W_]*ㅅ[\s\W_]*ㅜ[\s\W_]*ㄴ[\s\W_]*ㅅ[\s\W_]*ㅣ[\s\W_]*ㄹ"), "정치 드립 (ㅇㅣㅅㅜㄴㅅㅣㄹ)"),
+]
+
+# 순수 초성 우회 패턴 (원문 full_text에서만 검사하여 일반 한글 단어 오탐 방지)
+CHOSUNG_PATTERNS = [
     (re.compile(r"ㅅ[\s\W_]*ㅂ"), "초성 욕설 (ㅅㅂ)"),
     (re.compile(r"ㅆ[\s\W_]*ㅂ"), "초성 욕설 (ㅆㅂ)"),
     (re.compile(r"ㅂ[\s\W_]*ㅅ"), "초성 비하 (ㅂㅅ)"),
     (re.compile(r"ㅈ[\s\W_]*ㄹ"), "초성 욕설 (ㅈㄹ)"),
+    (re.compile(r"ㄴ[\s\W_]*ㄱ[\s\W_]*[ㅁㅃ]"), "초성 패륜/비하 (ㄴㄱㅁ/ㅃ)"),
     (re.compile(r"ㄴ[\s\W_]*ㅁ[\s\W_]*ㅎ"), "초성 정치 드립 (ㄴㅁㅎ)"),
     (re.compile(r"ㅇ[\s\W_]*ㅅ[\s\W_]*ㅅ"), "초성 정치 드립 (ㅇㅅㅅ)"),
 ]
@@ -155,16 +159,21 @@ def inspect_content(title: str, content: str, tags: str = "") -> Tuple[bool, Opt
         if kw in full_text or kw in cleaned:
             return True, "욕설 및 비하 표현 감지", kw
 
-
-    # 3. 우회 정규식 패턴 검사 (특수문자/숫자 침투)
+    # 4. 우회 정규식 패턴 검사 (특수문자/숫자 침투)
     for pattern, reason in FUZZY_PATTERNS:
         m = pattern.search(full_text)
         if m:
             return True, reason, m.group(0)
 
-    # 4. 자모 분해 패턴 검사 (자모 분리 우회)
+    # 5. 자모 분해 패턴 검사 (자모 분리 우회)
     for pattern, reason in JAMO_PATTERNS:
         m = pattern.search(jamo_text)
+        if m:
+            return True, reason, m.group(0)
+
+    # 6. 순수 초성 우회 패턴 검사 (원문 기준)
+    for pattern, reason in CHOSUNG_PATTERNS:
+        m = pattern.search(full_text)
         if m:
             return True, reason, m.group(0)
 
