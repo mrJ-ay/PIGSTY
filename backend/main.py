@@ -1055,7 +1055,8 @@ def create_comment(
     if len(content) > 1000:
         raise HTTPException(status_code=400, detail="댓글은 1000자 이하로 입력해주세요.")
 
-    violated, reason, matched_kw = inspect_content("", content, "")
+    nick_raw = (request.nickname or "").strip() if not current_user else ""
+    violated, reason, matched_kw = inspect_content("", content, nick_raw)
     if violated:
         raise HTTPException(
             status_code=400,
@@ -1149,7 +1150,8 @@ def create_post(
         gallery_slug = "free"
 
     # 검열봇 실시간 감지 검사
-    violated, reason, matched_kw = inspect_content(title, content, tags)
+    nick_raw = (request.nickname or "").strip() if not current_user else ""
+    violated, reason, matched_kw = inspect_content(title, content, f"{tags} {nick_raw}".strip())
 
     now = datetime.utcnow()
     initial_status = "censored" if violated else "active"
