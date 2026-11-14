@@ -2375,6 +2375,7 @@ function updateGalleryHeader() {
 
 async function selectGallery(slug) {
     currentGallery = slug || "all";
+    setHeaderActive(currentGallery === "all" ? 0 : 2);
     renderGalleryBar();
     updateGalleryHeader();
     await loadPosts(currentSort);
@@ -2616,7 +2617,6 @@ async function openGalleryDirectoryPage() {
     postsContainer.querySelectorAll(".gallery-dir-card").forEach(card => {
         card.addEventListener("click", async () => {
             if (sortSelect) sortSelect.disabled = false;
-            setHeaderActive(0);
             await selectGallery(card.dataset.slug || "all");
         });
     });
