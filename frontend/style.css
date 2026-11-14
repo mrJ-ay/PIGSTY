@@ -1741,3 +1741,50 @@ aside {
     font-size: 12px;
     color: #9ca3af;
 }
+
+.post-list-row {
+    padding: 16px 20px !important;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.post-list-row:hover {
+    border-color: #111111;
+    background: #fafafa;
+}
+
+.post-list-main {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.post-list-main .post-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 0;
+    color: #111111;
+}
+
+.post-comment-count {
+    font-size: 13px;
+    font-weight: 800;
+    color: #111111;
+}
+
+.post-list-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 12.5px;
+    color: #6b7280;
+}
+
+.like-btn.compact {
+    padding: 3px 10px;
+    font-size: 12px;
+    margin-left: auto;
+}

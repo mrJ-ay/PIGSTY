@@ -560,31 +560,12 @@ function createYouTubePreview(
 function createPostHTML(
     post
 ) {
-
-    const tags =
-        post.tags
-            ? post.tags
-                .split(",")
-                .map(
-                    tag =>
-                        tag.trim()
-                )
-                .filter(Boolean)
-            : [];
-
-    const youtubePreview =
-        createYouTubePreview(
-            post.content
-        );
-
     const adminButtons =
         currentUser &&
         Number(
             currentUser.is_admin
         ) === 1
-
         ? `
-
             <button
                 class="delete-btn"
                 data-id="${post.id}"
@@ -592,97 +573,45 @@ function createPostHTML(
             >
                 삭제
             </button>
-
         `
+        : "";
 
+    const commentBadge = (post.comment_count || 0) > 0
+        ? `<span class="post-comment-count">[${post.comment_count}]</span>`
         : "";
 
     return `
-
         <article
-            class="post-card"
+            class="post-card post-list-row"
             data-post-id="${post.id}"
         >
-
-            <div class="post-top">
-
-                <span class="post-author">
-                    <span class="post-gallery-tag" data-gallery="${escapeHtml(post.gallery_slug || "free")}">[${escapeHtml(post.gallery_name || "자유")} 갤]</span>
-                    ${post.is_concept ? `<span class="post-concept-badge">★ 개념글</span>` : ""}
-                    ${formatAuthorBadge(post.author, post.is_fixed, post.ip_prefix)}
-                </span>
-
-                <span class="post-date">
-                    ${formatDate(
-                        post.created_at
-                    )}
-                    <span class="post-meta-stats">조회 ${post.views || 0} · 댓글 ${post.comment_count || 0}</span>
-                </span>
-
+            <div class="post-list-main">
+                <span class="post-gallery-tag" data-gallery="${escapeHtml(post.gallery_slug || "free")}">[${escapeHtml(post.gallery_name || "자유")} 갤]</span>
+                ${post.is_concept ? `<span class="post-concept-badge">★ 개념글</span>` : ""}
+                <h2 class="post-title clickable" data-id="${post.id}">
+                    ${escapeHtml(post.title)}
+                </h2>
+                ${commentBadge}
             </div>
 
-
-            <h2 class="post-title clickable" data-id="${post.id}">
-                ${escapeHtml(
-                    post.title
-                )}
-            </h2>
-
-
-            <p class="post-content">
-                ${escapeHtml(
-                    post.content
-                )}
-            </p>
-
-
-            ${youtubePreview}
-
-
-            ${
-                tags.length
-
-                ? `
-
-                    <div class="post-tags">
-
-                        ${
-                            tags
-                                .map(
-                                    tag =>
-                                        `<span>
-                                            #${escapeHtml(
-                                                tag
-                                            )}
-                                        </span>`
-                                )
-                                .join("")
-                        }
-
-                    </div>
-
-                `
-
-                : ""
-            }
-
-
-            <div class="post-actions">
-
+            <div class="post-list-meta">
+                <span class="post-author">
+                    ${formatAuthorBadge(post.author, post.is_fixed, post.ip_prefix)}
+                </span>
+                <span class="post-date">
+                    ${formatDate(post.created_at)}
+                </span>
+                <span class="post-meta-stats">조회 ${post.views || 0}</span>
                 <button
-                    class="like-btn"
+                    class="like-btn compact"
                     data-id="${post.id}"
                     type="button"
                 >
                     ♥ ${post.likes || 0}
                 </button>
-
                 ${adminButtons}
-
             </div>
-
         </article>
-
     `;
 }
 
@@ -694,17 +623,21 @@ function createPostHTML(
 function attachPostEvents() {
 
     document
-        .querySelectorAll(".post-title.clickable")
-        .forEach(el => {
-            el.addEventListener("click", () => {
-                openPostDetailModal(Number(el.dataset.id));
+        .querySelectorAll(".post-card[data-post-id]")
+        .forEach(card => {
+            card.addEventListener("click", event => {
+                if (event.target.closest(".post-gallery-tag, .like-btn, .delete-btn")) {
+                    return;
+                }
+                openPostDetailModal(Number(card.dataset.postId));
             });
         });
 
     document
         .querySelectorAll(".post-gallery-tag")
         .forEach(el => {
-            el.addEventListener("click", () => {
+            el.addEventListener("click", event => {
+                event.stopPropagation();
                 selectGallery(el.dataset.gallery || "free");
             });
         });
