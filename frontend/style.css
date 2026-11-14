@@ -1660,3 +1660,52 @@ aside {
     background: #ffffff;
     font-size: 14px;
 }
+
+.fixed-nick-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 800;
+    color: #ffffff;
+    background: #2b4593;
+    border-radius: 50%;
+    width: 15px;
+    height: 15px;
+    margin-left: 3px;
+    vertical-align: middle;
+}
+
+.ip-prefix {
+    font-size: 11.5px;
+    color: #94a3b8;
+    margin-left: 2px;
+    font-weight: 400;
+}
+
+.guest-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.comment-form-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.detail-delete-btn {
+    padding: 7px 14px;
+    border-radius: 8px;
+    border: 1px solid #fecaca;
+    background: #fef2f2;
+    color: #dc2626;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.detail-delete-btn:hover {
+    background: #dc2626;
+    color: #ffffff;
+}

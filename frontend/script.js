@@ -609,9 +609,7 @@ function createPostHTML(
                 <span class="post-author">
                     <span class="post-gallery-tag" data-gallery="${escapeHtml(post.gallery_slug || "free")}">[${escapeHtml(post.gallery_name || "자유")} 갤]</span>
                     ${post.is_concept ? `<span class="post-concept-badge">★ 개념글</span>` : ""}
-                    ${escapeHtml(
-                        post.author
-                    )}
+                    ${formatAuthorBadge(post.author, post.is_fixed, post.ip_prefix)}
                 </span>
 
                 <span class="post-date">
@@ -721,17 +719,6 @@ function attachPostEvents() {
                 button.addEventListener(
                     "click",
                     async () => {
-
-                        if (!token) {
-
-                            alert(
-                                "로그인이 필요합니다."
-                            );
-
-                            openLoginModal();
-
-                            return;
-                        }
 
                         try {
 
@@ -918,17 +905,10 @@ async function createPost(
     title,
     content,
     tags,
-    gallerySlug = "free"
+    gallerySlug = "free",
+    nickname = "",
+    password = ""
 ) {
-
-    if (!token) {
-
-        alert(
-            "로그인이 필요합니다."
-        );
-
-        return;
-    }
 
     const result = await apiFetch(
         "/api/posts",
@@ -939,7 +919,9 @@ async function createPost(
                 title,
                 content,
                 tags,
-                gallery_slug: gallerySlug
+                gallery_slug: gallerySlug,
+                nickname: nickname || null,
+                password: password || null
             })
         }
     );
@@ -1276,21 +1258,17 @@ function showRegisterForm() {
 
 function openWriteModal() {
 
-    if (!currentUser) {
-
-        alert(
-            "로그인이 필요합니다."
-        );
-
-        openLoginModal();
-
-        return;
-    }
-
     const defaultGallery = currentGallery && currentGallery !== "all" ? currentGallery : "free";
     const galleryOptions = (galleries.length ? galleries : [{ slug: "free", name: "자유", category: "메이저" }])
         .map(g => `<option value="${escapeHtml(g.slug)}" ${g.slug === defaultGallery ? "selected" : ""}>${escapeHtml(g.name)} 갤러리 (${escapeHtml(g.category || "메이저")})</option>`)
         .join("");
+
+    const guestFields = currentUser ? "" : `
+        <div class="guest-row">
+            <input id="postNickname" type="text" placeholder="닉네임 (기본: ㅇㅇ)" maxlength="20">
+            <input id="postPassword" type="password" placeholder="비밀번호 (삭제용, 선택)" maxlength="30">
+        </div>
+    `;
 
     openModal(`
 
@@ -1314,6 +1292,8 @@ function openWriteModal() {
                 <select id="postGallery" class="modal-select">
                     ${galleryOptions}
                 </select>
+
+                ${guestFields}
 
                 <input
                     id="postTitle"
@@ -1366,6 +1346,12 @@ function openWriteModal() {
                         .getElementById("postGallery")
                         ?.value || "free";
 
+                const nickname =
+                    document.getElementById("postNickname")?.value || "";
+
+                const password =
+                    document.getElementById("postPassword")?.value || "";
+
                 const title =
                     document
                         .getElementById(
@@ -1393,7 +1379,9 @@ function openWriteModal() {
                         title,
                         content,
                         tags,
-                        gallerySlug
+                        gallerySlug,
+                        nickname,
+                        password
                     );
 
                 } catch (error) {
@@ -2454,13 +2442,16 @@ async function setConceptMode(enabled) {
     await loadPosts(currentSort);
 }
 
-function openCreateGalleryModal() {
-    if (!currentUser) {
-        alert("갤러리 개설은 로그인이 필요합니다.");
-        openLoginModal();
-        return;
+function formatAuthorBadge(author, isFixed, ipPrefix) {
+    if (isFixed) {
+        return `<strong>${escapeHtml(author)}</strong><span class="fixed-nick-badge" title="고정닉">✔</span>`;
     }
+    const nick = escapeHtml(author || "ㅇㅇ");
+    const ip = escapeHtml(ipPrefix || "127.0");
+    return `<span>${nick}<span class="ip-prefix">(${ip})</span></span>`;
+}
 
+function openCreateGalleryModal() {
     openModal(`
         <div class="modal-box">
             <button class="close" type="button">×</button>
@@ -2503,13 +2494,24 @@ async function openPostDetailModal(postId) {
             ? post.comments.map(c => `
                 <div class="comment-item">
                     <div class="comment-item-head">
-                        <strong>${escapeHtml(c.author)}</strong>
+                        <span>${formatAuthorBadge(c.author, c.is_fixed, c.ip_prefix)}</span>
                         <span>${formatDate(c.created_at)}</span>
                     </div>
                     <div class="comment-item-body">${escapeHtml(c.content)}</div>
                 </div>
             `).join("")
             : `<p style="font-size:13px; color:#94a3b8; margin-bottom:10px;">아직 댓글이 없습니다. 첫 댓글을 남겨보세요!</p>`;
+
+        const guestCommentFields = currentUser ? "" : `
+            <div class="guest-row">
+                <input id="detailCommentNick" type="text" placeholder="닉네임 (기본: ㅇㅇ)" maxlength="20">
+                <input id="detailCommentPw" type="password" placeholder="비밀번호 (삭제용, 선택)" maxlength="30">
+            </div>
+        `;
+
+        const canShowDelete =
+            (currentUser && (Number(currentUser.is_admin) === 1 || (post.is_fixed && post.author === currentUser.username))) ||
+            !post.is_fixed;
 
         openModal(`
             <div class="modal-box detail-modal-box">
@@ -2520,7 +2522,7 @@ async function openPostDetailModal(postId) {
                 </div>
                 <h2 style="margin-bottom:10px;">${escapeHtml(post.title)}</h2>
                 <div class="detail-meta">
-                    <strong>${escapeHtml(post.author)}</strong>
+                    <span>${formatAuthorBadge(post.author, post.is_fixed, post.ip_prefix)}</span>
                     <span>·</span>
                     <span>${formatDate(post.created_at)}</span>
                     <span>·</span>
@@ -2532,24 +2534,23 @@ async function openPostDetailModal(postId) {
                 ${youtubePreview}
                 <div class="detail-actions">
                     <button id="detailLikeBtn" class="like-btn" type="button">♥ 추천 ${post.likes || 0}</button>
+                    ${canShowDelete ? `<button id="detailDeleteBtn" class="detail-delete-btn" type="button">삭제</button>` : ""}
                 </div>
                 <div class="comments-section">
                     <h3>댓글 (${(post.comments || []).length})</h3>
                     <div id="detailCommentList" class="comment-list">${commentsHtml}</div>
-                    <form id="detailCommentForm" class="comment-form">
-                        <input id="detailCommentInput" type="text" placeholder="댓글을 입력하세요..." maxlength="1000" required>
-                        <button type="submit">등록</button>
+                    <form id="detailCommentForm" class="comment-form-wrap">
+                        ${guestCommentFields}
+                        <div class="comment-form">
+                            <input id="detailCommentInput" type="text" placeholder="댓글을 입력하세요..." maxlength="1000" required>
+                            <button type="submit">등록</button>
+                        </div>
                     </form>
                 </div>
             </div>
         `);
 
         document.getElementById("detailLikeBtn")?.addEventListener("click", async () => {
-            if (!token) {
-                alert("로그인이 필요합니다.");
-                openLoginModal();
-                return;
-            }
             try {
                 const res = await apiFetch(`/api/posts/${postId}/like`, { method: "POST" });
                 const btn = document.getElementById("detailLikeBtn");
@@ -2562,20 +2563,43 @@ async function openPostDetailModal(postId) {
             }
         });
 
-        document.getElementById("detailCommentForm")?.addEventListener("submit", async event => {
-            event.preventDefault();
-            if (!token) {
-                alert("댓글 작성은 로그인이 필요합니다.");
-                openLoginModal();
+        document.getElementById("detailDeleteBtn")?.addEventListener("click", async () => {
+            let pw = "";
+            if (!post.is_fixed && !(currentUser && Number(currentUser.is_admin) === 1)) {
+                pw = prompt("글 작성 시 입력한 비밀번호를 입력하세요:") || "";
+                if (!pw) return;
+            } else if (!confirm("이 게시글을 삭제하시겠습니까?")) {
                 return;
             }
+            try {
+                await apiFetch(`/api/posts/${postId}/delete`, {
+                    method: "POST",
+                    body: JSON.stringify({ password: pw || null })
+                });
+                closeModal();
+                await loadPosts(currentSort);
+                loadGalleries();
+                alert("게시글이 삭제되었습니다.");
+            } catch (err) {
+                alert(err.message);
+            }
+        });
+
+        document.getElementById("detailCommentForm")?.addEventListener("submit", async event => {
+            event.preventDefault();
             const input = document.getElementById("detailCommentInput");
             const content = input?.value?.trim() || "";
             if (!content) return;
+            const nickname = document.getElementById("detailCommentNick")?.value || "";
+            const password = document.getElementById("detailCommentPw")?.value || "";
             try {
                 await apiFetch(`/api/posts/${postId}/comments`, {
                     method: "POST",
-                    body: JSON.stringify({ content })
+                    body: JSON.stringify({
+                        content,
+                        nickname: nickname || null,
+                        password: password || null
+                    })
                 });
                 await openPostDetailModal(postId);
                 loadPosts(currentSort);

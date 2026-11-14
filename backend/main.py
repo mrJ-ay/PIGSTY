@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi import FastAPI, Depends, HTTPException, Header
+from fastapi import FastAPI, Depends, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
@@ -190,6 +190,23 @@ class Post(Base):
         nullable=False
     )
 
+    is_fixed = Column(
+        Integer,
+        default=1,
+        nullable=False
+    )
+
+    ip_prefix = Column(
+        String(40),
+        default="",
+        nullable=False
+    )
+
+    guest_password_hash = Column(
+        String(255),
+        nullable=True
+    )
+
     created_at = Column(
         DateTime,
         default=datetime.utcnow
@@ -217,6 +234,9 @@ class Comment(Base):
     post_id = Column(Integer, ForeignKey("posts.id", ondelete="CASCADE"), nullable=False, index=True)
     author = Column(String(50), nullable=False)
     content = Column(Text, nullable=False)
+    is_fixed = Column(Integer, default=1, nullable=False)
+    ip_prefix = Column(String(40), default="", nullable=False)
+    guest_password_hash = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -235,6 +255,12 @@ for _stmt in (
     "ALTER TABLE posts ADD COLUMN censored_at TIMESTAMP",
     "ALTER TABLE posts ADD COLUMN gallery_slug VARCHAR(60) NOT NULL DEFAULT 'free'",
     "ALTER TABLE posts ADD COLUMN views INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE posts ADD COLUMN is_fixed INTEGER NOT NULL DEFAULT 1",
+    "ALTER TABLE posts ADD COLUMN ip_prefix VARCHAR(40) NOT NULL DEFAULT ''",
+    "ALTER TABLE posts ADD COLUMN guest_password_hash VARCHAR(255)",
+    "ALTER TABLE comments ADD COLUMN is_fixed INTEGER NOT NULL DEFAULT 1",
+    "ALTER TABLE comments ADD COLUMN ip_prefix VARCHAR(40) NOT NULL DEFAULT ''",
+    "ALTER TABLE comments ADD COLUMN guest_password_hash VARCHAR(255)",
 ):
     try:
         with engine.begin() as conn:
@@ -449,6 +475,36 @@ def get_current_user(
     return user
 
 
+optional_security = HTTPBearer(auto_error=False)
+
+
+def get_optional_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(optional_security),
+    db: Session = Depends(get_db),
+) -> User | None:
+    if not credentials:
+        return None
+    try:
+        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("mode") != "oneid":
+            return None
+        username = payload.get("sub")
+        if not username:
+            return None
+        return db.query(User).filter(User.username == username).first()
+    except Exception:
+        return None
+
+
+def _client_ip_prefix(request: Request) -> str:
+    fwd = request.headers.get("x-forwarded-for", "")
+    raw_ip = fwd.split(",")[0].strip() if fwd else (request.client.host if request.client else "127.0.0.1")
+    parts = raw_ip.split(".")
+    if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
+        return f"{parts[0]}.{parts[1]}"
+    return raw_ip[:12] or "127.0"
+
+
 # =========================================================
 # Admin 확인
 # =========================================================
@@ -513,6 +569,8 @@ class PostCreate(BaseModel):
     content: str
     tags: str = ""
     gallery_slug: str = "free"
+    nickname: str | None = None
+    password: str | None = None
 
 
 class GalleryCreate(BaseModel):
@@ -525,6 +583,13 @@ class GalleryCreate(BaseModel):
 class CommentCreate(BaseModel):
 
     content: str
+    nickname: str | None = None
+    password: str | None = None
+
+
+class DeleteWithPasswordRequest(BaseModel):
+
+    password: str | None = None
 
 
 # =========================================================
@@ -790,6 +855,8 @@ def _serialize_post(post: Post, g_map: dict[str, str], c_counts: dict[int, int])
         "content": post.content,
         "tags": post.tags or "",
         "author": post.author,
+        "is_fixed": bool(post.is_fixed if post.is_fixed is not None else 1),
+        "ip_prefix": post.ip_prefix or "",
         "likes": likes,
         "views": post.views or 0,
         "comment_count": c_counts.get(post.id, 0),
@@ -840,7 +907,8 @@ def get_galleries(db: Session = Depends(get_db)):
 @app.post("/api/galleries")
 def create_gallery(
     request: GalleryCreate,
-    current_user: User = Depends(get_current_user),
+    req: Request,
+    current_user: User | None = Depends(get_optional_user),
     db: Session = Depends(get_db),
 ):
     name = request.name.strip()
@@ -866,12 +934,13 @@ def create_gallery(
     if db.query(Gallery).filter(Gallery.name == name).first():
         raise HTTPException(status_code=409, detail="이미 같은 이름의 갤러리가 존재합니다.")
 
+    creator_label = current_user.username if current_user else f"ㅇㅇ({_client_ip_prefix(req)})"
     gallery = Gallery(
         slug=raw_slug[:60],
         name=name,
         description=description or f"{name} 주제로 이야기하는 마이너 갤러리",
         category="마이너",
-        creator=current_user.username,
+        creator=creator_label,
         created_at=datetime.utcnow(),
     )
     db.add(gallery)
@@ -958,6 +1027,8 @@ def get_post_detail(
             "id": c.id,
             "post_id": c.post_id,
             "author": c.author,
+            "is_fixed": bool(c.is_fixed if c.is_fixed is not None else 1),
+            "ip_prefix": c.ip_prefix or "",
             "content": c.content,
             "created_at": c.created_at.isoformat() if c.created_at else None,
         }
@@ -970,7 +1041,8 @@ def get_post_detail(
 def create_comment(
     post_id: int,
     request: CommentCreate,
-    current_user: User = Depends(get_current_user),
+    req: Request,
+    current_user: User | None = Depends(get_optional_user),
     db: Session = Depends(get_db),
 ):
     post = db.query(Post).filter(Post.id == post_id).first()
@@ -990,10 +1062,26 @@ def create_comment(
             detail=f"🤖 [피그스티 검열봇] 댓글에서 '{reason} ({matched_kw})'이(가) 감지되어 등록이 차단되었습니다.",
         )
 
+    if current_user:
+        author = current_user.username
+        is_fixed = 1
+        ip_prefix = ""
+        pw_hash = None
+    else:
+        nick = (request.nickname or "").strip()[:20] or "ㅇㅇ"
+        author = nick
+        is_fixed = 0
+        ip_prefix = _client_ip_prefix(req)
+        pw = (request.password or "").strip()
+        pw_hash = hash_password(pw) if pw else None
+
     comment = Comment(
         post_id=post_id,
-        author=current_user.username,
+        author=author,
         content=content,
+        is_fixed=is_fixed,
+        ip_prefix=ip_prefix,
+        guest_password_hash=pw_hash,
         created_at=datetime.utcnow(),
     )
     db.add(comment)
@@ -1004,9 +1092,36 @@ def create_comment(
         "id": comment.id,
         "post_id": comment.post_id,
         "author": comment.author,
+        "is_fixed": bool(comment.is_fixed),
+        "ip_prefix": comment.ip_prefix or "",
         "content": comment.content,
         "created_at": comment.created_at.isoformat() if comment.created_at else None,
     }
+
+
+@app.post("/api/comments/{comment_id}/delete")
+def delete_comment_with_password(
+    comment_id: int,
+    request: DeleteWithPasswordRequest,
+    current_user: User | None = Depends(get_optional_user),
+    db: Session = Depends(get_db),
+):
+    comment = db.query(Comment).filter(Comment.id == comment_id).first()
+    if not comment:
+        raise HTTPException(status_code=404, detail="댓글을 찾을 수 없습니다.")
+
+    allowed = False
+    if current_user and (current_user.is_admin == 1 or (comment.is_fixed == 1 and comment.author == current_user.username)):
+        allowed = True
+    elif comment.guest_password_hash and request.password and verify_password(request.password, comment.guest_password_hash):
+        allowed = True
+
+    if not allowed:
+        raise HTTPException(status_code=403, detail="비밀번호가 일치하지 않거나 삭제 권한이 없습니다.")
+
+    db.delete(comment)
+    db.commit()
+    return {"message": "댓글이 삭제되었습니다."}
 
 
 # =========================================================
@@ -1016,7 +1131,8 @@ def create_comment(
 @app.post("/api/posts")
 def create_post(
     request: PostCreate,
-    current_user: User = Depends(get_current_user),
+    req: Request,
+    current_user: User | None = Depends(get_optional_user),
     db: Session = Depends(get_db)
 ):
     title = request.title.strip()
@@ -1040,11 +1156,27 @@ def create_post(
     censored_reason_text = f"{reason} ({matched_kw})" if violated else None
     censored_at_time = now if violated else None
 
+    if current_user:
+        author = current_user.username
+        is_fixed = 1
+        ip_prefix = ""
+        pw_hash = None
+    else:
+        nick = (request.nickname or "").strip()[:20] or "ㅇㅇ"
+        author = nick
+        is_fixed = 0
+        ip_prefix = _client_ip_prefix(req)
+        pw = (request.password or "").strip()
+        pw_hash = hash_password(pw) if pw else None
+
     post = Post(
         title=title,
         content=content,
         tags=tags,
-        author=current_user.username,
+        author=author,
+        is_fixed=is_fixed,
+        ip_prefix=ip_prefix,
+        guest_password_hash=pw_hash,
         likes=0,
         views=0,
         gallery_slug=gallery_slug,
@@ -1066,6 +1198,31 @@ def create_post(
         if violated else None
     )
     return result
+
+
+@app.post("/api/posts/{post_id}/delete")
+def delete_post_with_password(
+    post_id: int,
+    request: DeleteWithPasswordRequest,
+    current_user: User | None = Depends(get_optional_user),
+    db: Session = Depends(get_db),
+):
+    post = db.query(Post).filter(Post.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="게시물을 찾을 수 없습니다.")
+
+    allowed = False
+    if current_user and (current_user.is_admin == 1 or (post.is_fixed == 1 and post.author == current_user.username)):
+        allowed = True
+    elif post.guest_password_hash and request.password and verify_password(request.password, post.guest_password_hash):
+        allowed = True
+
+    if not allowed:
+        raise HTTPException(status_code=403, detail="비밀번호가 일치하지 않거나 삭제 권한이 없습니다.")
+
+    db.delete(post)
+    db.commit()
+    return {"message": "게시글이 삭제되었습니다."}
 
 
 # =========================================================
