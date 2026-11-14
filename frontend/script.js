@@ -2127,7 +2127,7 @@ document.addEventListener(
 
                 setHeaderActive(2);
 
-                openCategoryPage();
+                openGalleryDirectoryPage();
 
             }
         );
@@ -2612,5 +2612,67 @@ async function openPostDetailModal(postId) {
     } catch (err) {
         alert(err.message || "게시물을 불러오지 못했습니다.");
     }
+}
+
+async function openGalleryDirectoryPage() {
+    const postsContainer = document.getElementById("posts");
+    if (!postsContainer) return;
+
+    const sortSelect = document.getElementById("sortSelect");
+    if (sortSelect) sortSelect.disabled = true;
+
+    if (!galleries.length) {
+        await loadGalleries();
+    }
+
+    const majorList = galleries.filter(g => (g.category || "메이저") !== "마이너");
+    const minorList = galleries.filter(g => g.category === "마이너");
+
+    const renderCards = list => list.map(g => `
+        <div class="gallery-dir-card" data-slug="${escapeHtml(g.slug)}">
+            <div class="gallery-dir-top">
+                <strong>${escapeHtml(g.name)} 갤러리</strong>
+                <span class="gallery-type-badge ${g.category === "마이너" ? "minor" : ""}">${escapeHtml(g.category || "메이저")}</span>
+            </div>
+            <p class="gallery-dir-desc">${escapeHtml(g.description || "")}</p>
+            <div class="gallery-dir-meta">
+                <span>글 ${g.post_count || 0}</span>
+                <span>·</span>
+                <span>개념글 ${g.concept_count || 0}</span>
+            </div>
+        </div>
+    `).join("");
+
+    postsContainer.innerHTML = `
+        <div class="gallery-directory-wrap">
+            <div class="gallery-dir-section">
+                <div class="gallery-dir-header">
+                    <h3>메이저 갤러리</h3>
+                </div>
+                <div class="gallery-directory-grid">
+                    ${renderCards(majorList)}
+                </div>
+            </div>
+            <div class="gallery-dir-section">
+                <div class="gallery-dir-header">
+                    <h3>마이너 갤러리</h3>
+                    <button id="dirCreateGalleryBtn" class="create-gallery-btn" type="button">+ 마이너 갤러리 개설</button>
+                </div>
+                <div class="gallery-directory-grid">
+                    ${minorList.length ? renderCards(minorList) : `<p style="color:#6b7280; font-size:13px;">아직 개설된 마이너 갤러리가 없습니다. 첫 번째 마이너 갤러리를 개설해보세요!</p>`}
+                </div>
+            </div>
+        </div>
+    `;
+
+    postsContainer.querySelectorAll(".gallery-dir-card").forEach(card => {
+        card.addEventListener("click", async () => {
+            if (sortSelect) sortSelect.disabled = false;
+            setHeaderActive(0);
+            await selectGallery(card.dataset.slug || "all");
+        });
+    });
+
+    document.getElementById("dirCreateGalleryBtn")?.addEventListener("click", openCreateGalleryModal);
 }
 

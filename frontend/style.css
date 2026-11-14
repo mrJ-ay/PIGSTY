@@ -1677,3 +1677,67 @@ aside {
     color: #ffffff;
     border-color: #111111;
 }
+
+.gallery-directory-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.gallery-dir-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.gallery-dir-header h3 {
+    font-size: 16px;
+    font-weight: 800;
+    color: #111111;
+}
+
+.gallery-directory-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 12px;
+}
+
+.gallery-dir-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.gallery-dir-card:hover {
+    border-color: #111111;
+    transform: translateY(-2px);
+}
+
+.gallery-dir-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 15px;
+    color: #111111;
+}
+
+.gallery-dir-desc {
+    font-size: 13px;
+    color: #6b7280;
+    margin-bottom: 10px;
+    line-height: 1.45;
+}
+
+.gallery-dir-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #9ca3af;
+}
