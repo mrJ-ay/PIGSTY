@@ -184,20 +184,27 @@ function updateAuthUI() {
 
 function updateAdminUI() {
 
+    const isAdmin = Boolean(
+        currentUser &&
+        Number(currentUser.is_admin) === 1
+    );
+
     const button =
         document.getElementById(
             "deleteAllPostsBtn"
         );
 
-    if (!button) return;
+    if (button) {
+        button.style.display = isAdmin ? "block" : "none";
+    }
 
-    if (
-        currentUser &&
-        Number(currentUser.is_admin) === 1
-    ) {
-        button.style.display = "block";
-    } else {
-        button.style.display = "none";
+    const adminNavLink =
+        document.getElementById(
+            "adminNavLink"
+        );
+
+    if (adminNavLink) {
+        adminNavLink.style.display = isAdmin ? "inline-block" : "none";
     }
 }
 
@@ -210,6 +217,7 @@ function logout() {
     localStorage.removeItem(
         "pigsty_token"
     );
+    localStorage.removeItem("oneid_admin_access_token");
 
     sessionStorage.removeItem("oneid_admin_access_token");
     sessionStorage.removeItem(ONEID_PENDING_KEY);
@@ -2075,6 +2083,21 @@ document.addEventListener(
             }
         );
 
+        document.getElementById("adminNavLink")?.addEventListener(
+            "click",
+            event => {
+
+                event.preventDefault();
+
+                const links = Array.from(document.querySelectorAll("nav a"));
+                const idx = links.indexOf(event.currentTarget);
+                if (idx >= 0) setHeaderActive(idx);
+
+                openAdminPage();
+
+            }
+        );
+
 
         // =====================================================
         // 최신 / 인기 탭
@@ -2643,4 +2666,288 @@ async function openGalleryDirectoryPage() {
 
     document.getElementById("dirCreateGalleryBtn")?.addEventListener("click", openCreateGalleryModal);
 }
-
+
+
+
+// =========================================================
+// Admin Management Page
+// =========================================================
+
+let adminOverviewCache = null;
+
+async function openAdminPage() {
+    if (!currentUser || Number(currentUser.is_admin) !== 1) {
+        alert("관리자만 접근할 수 있습니다.");
+        return;
+    }
+
+    const postsContainer = document.getElementById("posts");
+    if (!postsContainer) return;
+
+    const headerBar = document.getElementById("galleryHeaderBar");
+    if (headerBar) headerBar.style.display = "none";
+
+    const sortSelect = document.getElementById("sortSelect");
+    if (sortSelect) sortSelect.disabled = true;
+
+    postsContainer.innerHTML = `
+        <div class="empty-posts">
+            <h3>관리자 콘솔 불러오는 중...</h3>
+            <p>잠시만 기다려주세요.</p>
+        </div>
+    `;
+
+    try {
+        const data = await apiFetch("/api/admin/overview");
+        adminOverviewCache = data;
+        renderAdminPage(data);
+    } catch (error) {
+        postsContainer.innerHTML = `
+            <div class="empty-posts">
+                <h3>관리자 콘솔 로드 실패</h3>
+                <p>${escapeHtml(error.message || "권한 또는 서버 상태를 확인해 주세요.")}</p>
+            </div>
+        `;
+    }
+}
+
+function renderAdminPage(data, searchQuery = "") {
+    const postsContainer = document.getElementById("posts");
+    if (!postsContainer) return;
+
+    const stats = data.stats || {};
+    const galleryList = data.galleries || [];
+    const postList = data.posts || [];
+    const q = (searchQuery || "").trim().toLowerCase();
+
+    const filteredPosts = q
+        ? postList.filter(p =>
+            (p.title || "").toLowerCase().includes(q) ||
+            (p.author || "").toLowerCase().includes(q) ||
+            (p.gallery_name || "").toLowerCase().includes(q) ||
+            (p.gallery_slug || "").toLowerCase().includes(q)
+        )
+        : postList;
+
+    const galleriesHtml = galleryList.map(g => `
+        <div class="admin-row-item">
+            <div class="admin-row-info">
+                <div class="admin-row-title">
+                    ${escapeHtml(g.name)} 갤러리
+                    <span style="color:#6b7280; font-weight:500;">(${escapeHtml(g.slug)})</span>
+                    ${g.protected ? `<span class="admin-badge protected">기본 보호</span>` : ""}
+                </div>
+                <div class="admin-row-meta">
+                    <span>분류: ${escapeHtml(g.category || "메이저")}</span>
+                    <span>·</span>
+                    <span>개설자: ${escapeHtml(g.creator || "system")}</span>
+                    <span>·</span>
+                    <span>게시물 ${g.post_count || 0}개</span>
+                </div>
+            </div>
+            <div class="admin-row-actions">
+                <button class="admin-btn small" type="button" data-admin-open-gallery="${escapeHtml(g.slug)}">이동</button>
+                ${g.protected
+                    ? ""
+                    : `<button class="admin-btn small danger" type="button" data-admin-del-gallery="${escapeHtml(g.slug)}" data-admin-gallery-name="${escapeHtml(g.name)}">갤러리 삭제</button>`}
+            </div>
+        </div>
+    `).join("");
+
+    const postsHtml = filteredPosts.length
+        ? filteredPosts.map(p => `
+            <div class="admin-row-item">
+                <div class="admin-row-info">
+                    <div class="admin-row-title">
+                        [${escapeHtml(p.gallery_name || p.gallery_slug || "자유")}] ${escapeHtml(p.title)}
+                    </div>
+                    <div class="admin-row-meta">
+                        <span class="admin-badge ${p.status === "censored" ? "censored" : "active"}">
+                            ${p.status === "censored" ? "격리됨" : "정상"}
+                        </span>
+                        <span>#${p.id}</span>
+                        <span>·</span>
+                        <span>${escapeHtml(p.author || "익명")}</span>
+                        <span>·</span>
+                        <span>${formatDate(p.created_at)}</span>
+                        <span>·</span>
+                        <span>조회 ${p.views || 0} / 추천 ${p.likes || 0}</span>
+                        ${p.censored_reason ? `<span>· 사유: ${escapeHtml(p.censored_reason)}</span>` : ""}
+                    </div>
+                </div>
+                <div class="admin-row-actions">
+                    <button class="admin-btn small" type="button" data-admin-view-post="${p.id}">보기</button>
+                    <button class="admin-btn small danger" type="button" data-admin-del-post="${p.id}">삭제</button>
+                </div>
+            </div>
+        `).join("")
+        : `<p style="color:#6b7280; font-size:13px; margin:8px 0;">표시할 게시물이 없습니다.</p>`;
+
+    postsContainer.innerHTML = `
+        <div class="admin-page-wrap">
+            <div class="admin-page-header">
+                <div>
+                    <h2>PIGSTY 관리자 콘솔</h2>
+                    <p>관리자 계정: <strong>${escapeHtml(data.admin || currentUser?.username || "admin")}</strong> · 게시물/갤러리 삭제 및 서버 리부트를 한 곳에서 관리합니다.</p>
+                </div>
+                <button id="adminRefreshBtn" class="admin-btn" type="button">새로고침</button>
+            </div>
+
+            <div class="admin-stat-grid">
+                <div class="admin-stat-card">
+                    <span class="admin-stat-label">전체 게시물</span>
+                    <span class="admin-stat-val">${stats.total_posts ?? 0}</span>
+                </div>
+                <div class="admin-stat-card">
+                    <span class="admin-stat-label">정상 게시물</span>
+                    <span class="admin-stat-val">${stats.active_posts ?? 0}</span>
+                </div>
+                <div class="admin-stat-card">
+                    <span class="admin-stat-label">검열 격리</span>
+                    <span class="admin-stat-val">${stats.censored_posts ?? 0}</span>
+                </div>
+                <div class="admin-stat-card">
+                    <span class="admin-stat-label">전체 갤러리</span>
+                    <span class="admin-stat-val">${stats.total_galleries ?? 0}</span>
+                </div>
+            </div>
+
+            <div class="admin-section-card">
+                <div class="admin-section-head">
+                    <h3>시스템 제어 (전체 삭제 · 리부트)</h3>
+                </div>
+                <div class="admin-action-row">
+                    <button id="adminSoftRebootBtn" class="admin-btn warn" type="button">소프트 리부트 (갤러리·검열봇 재동기화)</button>
+                    <button id="adminHardRebootBtn" class="admin-btn danger" type="button">서버 리부트 (백엔드 재시작)</button>
+                    <button id="adminDeleteAllBtn" class="admin-btn danger" type="button">전체 게시물 삭제</button>
+                </div>
+            </div>
+
+            <div class="admin-section-card">
+                <div class="admin-section-head">
+                    <h3>갤러리 관리 (${galleryList.length})</h3>
+                </div>
+                <div class="admin-table-list">
+                    ${galleriesHtml}
+                </div>
+            </div>
+
+            <div class="admin-section-card">
+                <div class="admin-section-head">
+                    <h3>게시물 관리 (최근 ${postList.length}건)</h3>
+                    <input id="adminPostSearch" class="admin-search-input" type="search" placeholder="제목 / 작성자 / 갤러리 검색" value="${escapeHtml(searchQuery)}">
+                </div>
+                <div id="adminPostList" class="admin-table-list">
+                    ${postsHtml}
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.getElementById("adminRefreshBtn")?.addEventListener("click", openAdminPage);
+
+    document.getElementById("adminSoftRebootBtn")?.addEventListener("click", async () => {
+        if (!confirm("기본 갤러리 복구 및 전체 게시물 소급 검열을 다시 실행할까요?")) return;
+        try {
+            const res = await apiFetch("/api/admin/reboot", {
+                method: "POST",
+                body: JSON.stringify({ mode: "soft" })
+            });
+            alert(res.message || "소프트 리부트 완료");
+            await loadGalleries();
+            await loadCensorStats();
+            await openAdminPage();
+        } catch (err) {
+            alert(err.message);
+        }
+    });
+
+    document.getElementById("adminHardRebootBtn")?.addEventListener("click", async () => {
+        if (!confirm("백엔드 서버 프로세스를 재시작(리부트)합니다.\n잠시 5초 정도 접속이 끊길 수 있습니다. 계속할까요?")) return;
+        try {
+            const res = await apiFetch("/api/admin/reboot", {
+                method: "POST",
+                body: JSON.stringify({ mode: "hard" })
+            });
+            alert(res.message || "서버 리부트를 요청했습니다. 5초 후 새로고침됩니다.");
+            setTimeout(() => location.reload(), 5000);
+        } catch (err) {
+            alert(err.message);
+        }
+    });
+
+    document.getElementById("adminDeleteAllBtn")?.addEventListener("click", async () => {
+        if (!confirm("정말 모든 게시물을 삭제하시겠습니까?")) return;
+        if (!confirm("⚠️ 모든 게시물이 영구적으로 삭제됩니다. 계속하시겠습니까?")) return;
+        try {
+            const res = await apiFetch("/api/admin/posts", { method: "DELETE" });
+            alert(`${res.deleted_count ?? 0}개의 게시물이 모두 삭제되었습니다.`);
+            await loadGalleries();
+            await loadCensorStats();
+            await openAdminPage();
+        } catch (err) {
+            alert(err.message);
+        }
+    });
+
+    document.getElementById("adminPostSearch")?.addEventListener("input", event => {
+        const val = event.target.value || "";
+        const cursor = event.target.selectionStart;
+        renderAdminPage(adminOverviewCache, val);
+        const nextInput = document.getElementById("adminPostSearch");
+        if (nextInput) {
+            nextInput.focus();
+            if (typeof cursor === "number") nextInput.setSelectionRange(cursor, cursor);
+        }
+    });
+
+    postsContainer.querySelectorAll("[data-admin-open-gallery]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const sortSel = document.getElementById("sortSelect");
+            if (sortSel) sortSel.disabled = false;
+            await selectGallery(btn.dataset.adminOpenGallery || "all");
+        });
+    });
+
+    postsContainer.querySelectorAll("[data-admin-del-gallery]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const slug = btn.dataset.adminDelGallery;
+            const name = btn.dataset.adminGalleryName || slug;
+            if (!slug) return;
+            if (!confirm(`'${name}' 갤러리(${slug})와 해당 갤러리의 모든 게시물을 삭제하시겠습니까?`)) return;
+            try {
+                const res = await apiFetch(`/api/admin/galleries/${encodeURIComponent(slug)}?delete_posts=true`, {
+                    method: "DELETE"
+                });
+                alert(res.message || "갤러리가 삭제되었습니다.");
+                await loadGalleries();
+                await openAdminPage();
+            } catch (err) {
+                alert(err.message);
+            }
+        });
+    });
+
+    postsContainer.querySelectorAll("[data-admin-view-post]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const id = Number(btn.dataset.adminViewPost);
+            if (id) await openPostDetailModal(id);
+        });
+    });
+
+    postsContainer.querySelectorAll("[data-admin-del-post]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const id = Number(btn.dataset.adminDelPost);
+            if (!id) return;
+            if (!confirm(`게시물 #${id} 을(를) 삭제하시겠습니까?`)) return;
+            try {
+                await apiFetch(`/api/admin/posts/${id}`, { method: "DELETE" });
+                await loadGalleries();
+                await loadCensorStats();
+                await openAdminPage();
+            } catch (err) {
+                alert(err.message);
+            }
+        });
+    });
+}

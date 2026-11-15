@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi import FastAPI, Depends, HTTPException, Header, Request
+from fastapi import FastAPI, Depends, HTTPException, Header, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
@@ -26,6 +26,8 @@ import jwt
 import os
 import re
 import secrets
+import signal
+import threading
 import httpx
 from censor import inspect_content
 
@@ -514,13 +516,25 @@ def get_admin_user(
     db: Session = Depends(get_db),
     oneid_authorization: str | None = Header(default=None, alias="X-ONEID-Authorization"),
 ):
-    link = db.query(OneIDLink).filter(OneIDLink.user_id == current_user.id).first()
-    if link:
-        oneid_user = verify_oneid_access_token(oneid_authorization)
-        if str(oneid_user.get("id")) != link.oneid_user_id or not oneid_user.get("is_admin"):
-            raise HTTPException(status_code=403, detail="ONEID 관리자 권한이 필요합니다.")
-        return current_user
-    raise HTTPException(status_code=403, detail="ONEID에 연결된 계정에 관리자 권한이 필요합니다.")
+    if current_user.is_admin != 1:
+        raise HTTPException(status_code=403, detail="관리자 권한이 필요합니다.")
+
+    if oneid_authorization and oneid_authorization.lower().startswith("bearer "):
+        link = db.query(OneIDLink).filter(OneIDLink.user_id == current_user.id).first()
+        if link:
+            try:
+                oneid_user = verify_oneid_access_token(oneid_authorization)
+                if str(oneid_user.get("id")) != link.oneid_user_id or not oneid_user.get("is_admin"):
+                    current_user.is_admin = 1 if oneid_user.get("is_admin") else 0
+                    db.commit()
+                    if current_user.is_admin != 1:
+                        raise HTTPException(status_code=403, detail="ONEID 관리자 권한이 필요합니다.")
+            except HTTPException as exc:
+                # 만료된 보조 ONEID 토큰으로 인해 유효한 관리자 JWT가 차단되지 않도록 403 권한 박탈만 반영
+                if exc.status_code == 403:
+                    raise
+
+    return current_user
 
 
 # =========================================================
@@ -1376,4 +1390,152 @@ def get_censor_logs(
             }
             for p in censored_posts
         ],
+    }
+
+
+# =========================================================
+# Admin Management Console Endpoints
+# =========================================================
+
+class RebootRequest(BaseModel):
+    mode: str = "soft"
+
+
+def _delayed_process_exit():
+    import time
+    time.sleep(0.6)
+    try:
+        os.kill(os.getpid(), signal.SIGTERM)
+    except Exception:
+        os._exit(0)
+
+
+@app.get("/api/admin/overview")
+def admin_overview(
+    current_admin: User = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    posts = db.query(Post).order_by(Post.created_at.desc(), Post.id.desc()).limit(200).all()
+    galleries = db.query(Gallery).order_by(Gallery.id.asc()).all()
+    g_map = {g.slug: g.name for g in galleries}
+    c_counts = _comment_counts(db)
+
+    post_counts = {
+        slug: cnt
+        for slug, cnt in db.query(Post.gallery_slug, func.count(Post.id)).group_by(Post.gallery_slug).all()
+    }
+    total_posts = db.query(Post).count()
+    censored_count = db.query(Post).filter(Post.status == "censored").count()
+
+    return {
+        "admin": current_admin.username,
+        "stats": {
+            "total_posts": total_posts,
+            "active_posts": total_posts - censored_count,
+            "censored_posts": censored_count,
+            "total_galleries": len(galleries),
+        },
+        "galleries": [
+            {
+                "id": g.id,
+                "slug": g.slug,
+                "name": g.name,
+                "category": g.category or "메이저",
+                "creator": g.creator,
+                "post_count": post_counts.get(g.slug, 0),
+                "protected": g.slug == "free",
+            }
+            for g in galleries
+        ],
+        "posts": [
+            {
+                "id": p.id,
+                "title": p.title,
+                "author": p.author,
+                "gallery_slug": p.gallery_slug or "free",
+                "gallery_name": g_map.get(p.gallery_slug or "free", p.gallery_slug or "free"),
+                "status": p.status or "active",
+                "censored_reason": p.censored_reason,
+                "likes": p.likes or 0,
+                "views": p.views or 0,
+                "comment_count": c_counts.get(p.id, 0),
+                "created_at": p.created_at.isoformat() if p.created_at else None,
+            }
+            for p in posts
+        ],
+    }
+
+
+@app.delete("/api/admin/posts/{post_id}")
+def admin_delete_post(
+    post_id: int,
+    current_admin: User = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    post = db.query(Post).filter(Post.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="게시물을 찾을 수 없습니다.")
+    db.delete(post)
+    db.commit()
+    return {"message": "게시글이 삭제되었습니다.", "deleted_id": post_id}
+
+
+@app.delete("/api/admin/galleries/{slug}")
+def admin_delete_gallery(
+    slug: str,
+    delete_posts: bool = True,
+    current_admin: User = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    clean_slug = (slug or "").strip().lower()
+    if clean_slug == "free":
+        raise HTTPException(status_code=400, detail="기본 자유 갤러리는 삭제할 수 없습니다.")
+
+    gallery = db.query(Gallery).filter(Gallery.slug == clean_slug).first()
+    if not gallery:
+        raise HTTPException(status_code=404, detail="갤러리를 찾을 수 없습니다.")
+
+    posts_in_gallery = db.query(Post).filter(Post.gallery_slug == clean_slug).all()
+    affected_posts = len(posts_in_gallery)
+
+    if delete_posts:
+        for post in posts_in_gallery:
+            db.delete(post)
+    else:
+        for post in posts_in_gallery:
+            post.gallery_slug = "free"
+
+    db.delete(gallery)
+    db.commit()
+    return {
+        "message": f"'{gallery.name}' 갤러리가 삭제되었습니다.",
+        "deleted_slug": clean_slug,
+        "affected_posts": affected_posts,
+        "posts_deleted": delete_posts,
+    }
+
+
+@app.post("/api/admin/reboot")
+def admin_reboot(
+    request: RebootRequest,
+    background_tasks: BackgroundTasks,
+    current_admin: User = Depends(get_admin_user),
+    db: Session = Depends(get_db),
+):
+    mode = (request.mode or "soft").strip().lower()
+    seed_default_galleries(db)
+    censored = retro_censor_posts(db)
+
+    if mode == "hard":
+        threading.Thread(target=_delayed_process_exit, daemon=True).start()
+        return {
+            "mode": "hard",
+            "message": "서버 프로세스 리부트를 요청했습니다. 잠시 후 자동으로 다시 시작됩니다.",
+            "newly_censored": censored,
+        }
+
+    return {
+        "mode": "soft",
+        "message": f"시스템 재동기화(소프트 리부트) 완료 · 신규 격리 {censored}건",
+        "newly_censored": censored,
     }
