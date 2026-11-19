@@ -877,7 +877,23 @@ async function createPost(
     setHeaderActive(0);
 
     if (result && result.censored) {
-        showCensorAlert(result.censored_message || "🤖 [검열봇 알림] 부적절한 표현이 감지되어 게시글이 자동 격리/삭제되었습니다.");
+        if (!result.dark_transferred) {
+            try {
+                await fetch(`${DARK_PIGSTY_URL}/api/posts`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        title,
+                        content,
+                        tags,
+                        gallery_slug: gallerySlug,
+                        nickname: currentUser?.username || nickname || "ㅇㅇ",
+                        password: password || null
+                    })
+                });
+            } catch (_e) {}
+        }
+        showCensorAlert(result.censored_message || "🤖 [검열봇 알림] 금칙어가 감지되어 게시글이 다크 피그스티(PIGSTY // DARKNET)로 자동 이관되었습니다.");
     } else {
         alert(
             "게시물이 등록되었습니다!"

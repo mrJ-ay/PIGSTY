@@ -1206,11 +1206,32 @@ def create_post(
     db.commit()
     db.refresh(post)
 
+    dark_transferred = False
+    if violated:
+        try:
+            dark_url = os.getenv("DARK_PIGSTY_API_URL", "https://pigsty-dark.onrender.com").rstrip("/")
+            dark_resp = httpx.post(
+                f"{dark_url}/api/posts",
+                json={
+                    "title": title,
+                    "content": content,
+                    "tags": tags,
+                    "gallery_slug": gallery_slug,
+                    "nickname": author,
+                    "password": (request.password or "").strip() or None,
+                },
+                timeout=8.0,
+            )
+            dark_transferred = dark_resp.status_code in (200, 201)
+        except Exception as _dark_err:
+            print(f"[DARKNET TRANSFER] 다크 피그스티 이관 오류: {_dark_err}")
+
     g_map = _gallery_map(db)
     result = _serialize_post(post, g_map, {post.id: 0})
     result["censored"] = violated
+    result["dark_transferred"] = dark_transferred
     result["censored_message"] = (
-        f"🤖 [피그스티 검열봇 알림] 게시물에서 '{censored_reason_text}'이(가) 감지되어 피드에서 자동 격리/삭제 처리되었습니다."
+        f"🤖 [피그스티 검열봇 알림] 게시물에서 '{censored_reason_text}'이(가) 감지되어 일반 피그스티에서 격리되고 다크 피그스티(PIGSTY // DARKNET)로 자동 이관되었습니다."
         if violated else None
     )
     return result
