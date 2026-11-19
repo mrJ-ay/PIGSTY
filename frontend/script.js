@@ -2304,6 +2304,8 @@ document.addEventListener(
 // Censor Bot UI & Handlers
 // =========================================================
 
+const DARK_PIGSTY_URL = "https://pigsty-dark.onrender.com";
+
 function showCensorAlert(message) {
     const existing = document.getElementById("censorAlertOverlay");
     if (existing) existing.remove();
@@ -2316,15 +2318,32 @@ function showCensorAlert(message) {
             <div class="censor-icon-wrap">
                 <span class="censor-icon">🤖🚫</span>
             </div>
-            <h3 class="censor-alert-title">피그스티 검열봇 경고</h3>
+            <h3 class="censor-alert-title">피그스티 검열봇 감지 — 다크 피그스티로 강제 이송</h3>
             <p class="censor-alert-desc">${escapeHtml(message)}</p>
             <div class="censor-alert-notice">
-                <span>※ 감지된 사유와 함께 작성된 글은 실시간 격리되었으며, 공개 피드에 노출되지 않습니다.</span>
+                <span>※ 일반 피그스티에서 금칙어가 감지되어 격리 조치되었습니다.<br><strong id="censorRedirectCount">2</strong>초 후 무검열 제한구역 <strong>PIGSTY // DARKNET</strong>으로 자동 이동합니다...</span>
             </div>
-            <button type="button" class="censor-close-btn" onclick="document.getElementById('censorAlertOverlay').remove()">확인</button>
+            <button type="button" class="censor-close-btn" id="censorGoDarkNowBtn">지금 즉시 다크 피그스티로 이동 →</button>
         </div>
     `;
     document.body.appendChild(overlay);
+
+    document.getElementById("censorGoDarkNowBtn")?.addEventListener("click", () => {
+        window.location.href = DARK_PIGSTY_URL;
+    });
+
+    let remaining = 2;
+    const timer = setInterval(() => {
+        remaining -= 1;
+        const countEl = document.getElementById("censorRedirectCount");
+        if (countEl && remaining > 0) {
+            countEl.textContent = String(remaining);
+        }
+        if (remaining <= 0) {
+            clearInterval(timer);
+            window.location.href = DARK_PIGSTY_URL;
+        }
+    }, 1000);
 }
 
 async function loadCensorStats() {
@@ -2470,7 +2489,12 @@ function openCreateGalleryModal() {
             await selectGallery(created.slug);
             alert(`${created.name} 갤러리가 개설되었습니다!`);
         } catch (err) {
-            alert(err.message);
+            if (err.message && (err.message.includes("검열봇") || err.message.includes("부적절한 표현"))) {
+                closeModal();
+                showCensorAlert(err.message);
+            } else {
+                alert(err.message);
+            }
         }
     });
 }
@@ -2593,7 +2617,12 @@ async function openPostDetailModal(postId) {
                 await openPostDetailModal(postId);
                 loadPosts(currentSort);
             } catch (err) {
-                alert(err.message);
+                if (err.message && (err.message.includes("검열봇") || err.message.includes("부적절한 표현"))) {
+                    closeModal();
+                    showCensorAlert(err.message);
+                } else {
+                    alert(err.message);
+                }
             }
         });
 
